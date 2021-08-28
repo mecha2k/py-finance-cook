@@ -4,106 +4,123 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import quandl
 import intrinio_sdk as intrinio
+import requests
 import os
 import warnings
 from icecream import ic
 from dotenv import load_dotenv
+from pprint import pprint
+from datetime import datetime
 
 load_dotenv(verbose=True)
 
 plt.style.use("seaborn")
 plt.rcParams["figure.dpi"] = 300
 warnings.simplefilter(action="ignore", category=FutureWarning)
+quandl.ApiConfig.api_key = os.getenv("Quandl")
+api_key = os.getenv("Alpha_vantage")
+
+src_data = "data/aapl.csv"
+start = datetime(2000, 1, 1)
+end = datetime(2020, 12, 31)
+try:
+    aapl = pd.read_csv(src_data, parse_dates=["Date"])
+    aapl = aapl.set_index("Date")
+    print("data reading from file...")
+except FileNotFoundError:
+    aapl = yf.download("AAPL", start=start, end=end)
+    aapl.to_csv(src_data)
+ic(aapl.head())
 
 # df_yahoo = yf.download("AAPL", start="2000-01-01", end="2010-12-31", progress=False)
 # print(f"Downloaded {df_yahoo.shape[0]} rows of data.")
 # ic(df_yahoo.head())
 #
-# quandl.ApiConfig.api_key = os.getenv("Quandl")
 # df_quandl = quandl.get(dataset="WIKI/AAPL", start_date="2000-01-01", end_date="2010-12-31")
-#
 # print(f"Downloaded {df_quandl.shape[0]} rows of data.")
 # ic(df_quandl.head())
+#
+#
+# # replace the "demo" apikey below with your own key from https://www.alphavantage.co/support/#api-key
+# url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=AAPL&interval=5min&apikey={api_key}"
+# res = requests.get(url)
+# pprint(res.json())
+
+# # # 2. Authenticate using the personal API key and select the API:
+# intrinio.ApiClient().configuration.api_key["api_key"] = os.getenv("Intrinio")
+# intrinio.ApiClient().allow_retries(True)
+# response = intrinio.SecurityApi().get_security_stock_prices(
+#     identifier="AAPL",
+#     start_date="2000-01-01",
+#     end_date="2010-12-31",
+#     frequency="daily",
+#     page_size=100,
+# )
+# response_list = [x.to_dict() for x in response.stock_prices]
+# df_intrinio = pd.DataFrame(response_list).sort_values("date")
+# df_intrinio.set_index("date", inplace=True)
+# print(f"Downloaded {df_intrinio.shape[0]} rows of data.")
+# ic(df_intrinio.head())
+#
+df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", progress=False)
+df = df.loc[:, ["Adj Close"]]
+df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
+
+df["simple_rtn"] = df.adj_close.pct_change()
+df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
+ic(df.head())
+
+df_all_dates = pd.DataFrame(index=pd.date_range(start="1999-12-31", end="2010-12-31"))
+df = df_all_dates.join(df[["adj_close"]], how="left").fillna(method="ffill").asfreq("M")
 
 
-# # 2. Authenticate using the personal API key and select the API:
-# intrinio_sdk.ApiClient().configuration.api_key[
-#     "api_key"
-# ] = "{key}"  # replace {key} with your own API key
-intrinio.ApiClient().set_api_key(os.getenv("Intrinio"))
-intrinio.ApiClient().allow_retries(True)
-response = intrinio.SecurityApi().get_security_stock_prices(
-    identifier="AAPL",
-    start_date="2000-01-01",
-    end_date="2010-12-31",
-    frequency="daily",
-    page_size=100,
-)
-response_list = [x.to_dict() for x in response.stock_prices]
-df_intrinio = pd.DataFrame(response_list).sort_values("date")
-df_intrinio.set_index("date", inplace=True)
-print(f"Downloaded {df_intrinio.shape[0]} rows of data.")
-ic(df_intrinio.head())
-#
-# df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", progress=False)
-# df = df.loc[:, ["Adj Close"]]
-# df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
-#
-# df["simple_rtn"] = df.adj_close.pct_change()
-# df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
-# ic(df.head())
-#
-# df_all_dates = pd.DataFrame(index=pd.date_range(start="1999-12-31", end="2010-12-31"))
-# df = df_all_dates.join(df[["adj_close"]], how="left").fillna(method="ffill").asfreq("M")
-#
-#
-# # 3. Download inflation data from Quandl:
-# df_cpi = quandl.get(dataset="RATEINF/CPI_USA", start_date="1999-12-01", end_date="2010-12-31")
-# df_cpi.rename(columns={"Value": "cpi"}, inplace=True)
-#
-# # 4. Merge inflation data to prices:
-# df_merged = df.join(df_cpi, how="left")
-#
-# # 5. Calculate simple returns and inflation rate:
-# df_merged["simple_rtn"] = df_merged.adj_close.pct_change()
-# df_merged["inflation_rate"] = df_merged.cpi.pct_change()
-#
-# # 6. Adjust returns for inflation:
-# df_merged["real_rtn"] = (df_merged.simple_rtn + 1) / (df_merged.inflation_rate + 1) - 1
-# ic(df_merged.head())
-#
-# # ## Changing frequency
-# df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", auto_adjust=False, progress=False)
-#
-# # keep only the adjusted close price
-# df = df.loc[:, ["Adj Close"]]
-# df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
-#
-# # calculate simple returns
-# df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
-#
-# # remove redundant data
-# df.drop("adj_close", axis=1, inplace=True)
-# df.dropna(axis=0, inplace=True)
-# ic(df.head())
-#
-#
-# def realized_volatility(x):
-#     return np.sqrt(np.sum(x ** 2))
-#
-#
-# # 3. Calculate monthly realized volatility:
-# df_rv = df.groupby(pd.Grouper(freq="M")).apply(realized_volatility)
-# df_rv.rename(columns={"log_rtn": "rv"}, inplace=True)
-#
-# # 4. Annualize the values:
-# df_rv.rv = df_rv.rv * np.sqrt(12)
-# fig, ax = plt.subplots(2, 1, sharex=True)
-# ax[0].plot(df)
-# ax[1].plot(df_rv)
-# plt.tight_layout()
-# plt.savefig("images/ch1_im6.png")
-#
+# 3. Download inflation data from Quandl:
+df_cpi = quandl.get(dataset="RATEINF/CPI_USA", start_date="1999-12-01", end_date="2010-12-31")
+df_cpi.rename(columns={"Value": "cpi"}, inplace=True)
+
+# 4. Merge inflation data to prices:
+df_merged = df.join(df_cpi, how="left")
+
+# 5. Calculate simple returns and inflation rate:
+df_merged["simple_rtn"] = df_merged.adj_close.pct_change()
+df_merged["inflation_rate"] = df_merged.cpi.pct_change()
+
+# 6. Adjust returns for inflation:
+df_merged["real_rtn"] = (df_merged.simple_rtn + 1) / (df_merged.inflation_rate + 1) - 1
+ic(df_merged.head())
+
+# ## Changing frequency
+df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", auto_adjust=False, progress=False)
+
+# keep only the adjusted close price
+df = df.loc[:, ["Adj Close"]]
+df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
+
+# calculate simple returns
+df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
+
+# remove redundant data
+df.drop("adj_close", axis=1, inplace=True)
+df.dropna(axis=0, inplace=True)
+ic(df.head())
+
+
+def realized_volatility(x):
+    return np.sqrt(np.sum(x ** 2))
+
+
+# 3. Calculate monthly realized volatility:
+df_rv = df.groupby(pd.Grouper(freq="M")).apply(realized_volatility)
+df_rv.rename(columns={"log_rtn": "rv"}, inplace=True)
+
+# 4. Annualize the values:
+df_rv.rv = df_rv.rv * np.sqrt(12)
+fig, ax = plt.subplots(2, 1, sharex=True)
+ax[0].plot(df)
+ax[1].plot(df_rv)
+plt.tight_layout()
+plt.savefig("images/ch1_im6.png")
+
 # # download data as pandas DataFrame
 # df = yf.download("MSFT", auto_adjust=False, progress=False)
 # df = df.loc[:, ["Adj Close"]]
@@ -115,8 +132,8 @@ ic(df_intrinio.head())
 #
 # # dropping NA's in the first row
 # df.dropna(how="any", inplace=True)
-#
-#
+
+
 # # ### How to do it...
 #
 # # #### the `plot` method of pandas
