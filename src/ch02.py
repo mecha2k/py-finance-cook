@@ -296,35 +296,35 @@ if __name__ == "__main__":
     plt.savefig("images/ch2_im9.png")
 
     ## Calculating the relative strength index and testing a long/short strategy
-    # class RsiSignalStrategy(bt.SignalStrategy):
-    #     params = dict(rsi_periods=14, rsi_upper=70, rsi_lower=30, rsi_mid=50)
-    #
-    #     def __init__(self):
-    #         # add RSI indicator
-    #         rsi = bt.indicators.RSI(
-    #             period=self.p.rsi_periods, upperband=self.p.rsi_upper, lowerband=self.p.rsi_lower
-    #         )
-    #         # add RSI from TA-lib just for reference
-    #         bt.talib.RSI(self.data, plotname="TA_RSI")
-    #         # long condition (with exit)
-    #         rsi_signal_long = bt.ind.CrossUp(rsi, self.p.rsi_lower, plot=False)
-    #         self.signal_add(bt.SIGNAL_LONG, rsi_signal_long)
-    #         self.signal_add(bt.SIGNAL_LONGEXIT, -(rsi > self.p.rsi_mid))
-    #         # short condition (with exit)
-    #         rsi_signal_short = -bt.ind.CrossDown(rsi, self.p.rsi_upper, plot=False)
-    #         self.signal_add(bt.SIGNAL_SHORT, rsi_signal_short)
-    #         self.signal_add(bt.SIGNAL_SHORTEXIT, rsi < self.p.rsi_mid)
-    #
-    # cerebro = bt.Cerebro(stdstats=False)
-    # cerebro.addstrategy(RsiSignalStrategy)
-    # cerebro.adddata(data)
-    # cerebro.broker.setcash(1000.0)
-    # cerebro.broker.setcommission(commission=0.001)
-    # cerebro.addobserver(bt.observers.BuySell)
-    # cerebro.addobserver(bt.observers.Value)
-    # print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    # cerebro.run()
-    # print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
+    class RsiSignalStrategy(bt.SignalStrategy):
+        params = dict(rsi_periods=14, rsi_upper=70, rsi_lower=30, rsi_mid=50)
+
+        def __init__(self):
+            # add RSI indicator
+            rsi = bt.indicators.RSI(
+                period=self.p.rsi_periods, upperband=self.p.rsi_upper, lowerband=self.p.rsi_lower
+            )
+            # add RSI from TA-lib just for reference
+            bt.talib.RSI(self.data, plotname="TA_RSI")
+            # long condition (with exit)
+            rsi_signal_long = bt.ind.CrossUp(rsi, self.p.rsi_lower, plot=False)
+            self.signal_add(bt.SIGNAL_LONG, rsi_signal_long)
+            self.signal_add(bt.SIGNAL_LONGEXIT, -(rsi > self.p.rsi_mid))
+            # short condition (with exit)
+            rsi_signal_short = -bt.ind.CrossDown(rsi, self.p.rsi_upper, plot=False)
+            self.signal_add(bt.SIGNAL_SHORT, rsi_signal_short)
+            self.signal_add(bt.SIGNAL_SHORTEXIT, rsi < self.p.rsi_mid)
+
+    cerebro = bt.Cerebro(stdstats=False)
+    cerebro.addstrategy(RsiSignalStrategy)
+    cerebro.adddata(data)
+    cerebro.broker.setcash(1000.0)
+    cerebro.broker.setcommission(commission=0.001)
+    cerebro.addobserver(bt.observers.BuySell)
+    cerebro.addobserver(bt.observers.Value)
+    print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
+    cerebro.run()
+    print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
     # cerebro.plot(iplot=False, volume=False)
 
     ## Building an Interactive Dashboard for Technical Analysis
