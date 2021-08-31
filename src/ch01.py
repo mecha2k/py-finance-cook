@@ -251,7 +251,6 @@ if __name__ == "__main__":
     N_LAGS = 50
     SIGNIFICANCE_LEVEL = 0.05
     acf = smt.graphics.plot_acf(df.log_rtn, lags=N_LAGS, alpha=SIGNIFICANCE_LEVEL)
-
     plt.tight_layout()
     plt.savefig("images/ch1_im13.png")
 
@@ -270,7 +269,6 @@ if __name__ == "__main__":
     df["moving_std_21"] = df[["log_rtn"]].rolling(window=21).std()
 
     fig, ax = plt.subplots(3, 1, figsize=(18, 15), sharex=True)
-
     df.adj_close.plot(ax=ax[0])
     ax[0].set(title="S&P 500 time series", ylabel="Price ($)")
     df.log_rtn.plot(ax=ax[1])
