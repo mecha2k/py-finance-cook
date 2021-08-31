@@ -1,6 +1,7 @@
 import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
 import backtrader as bt
 import quandl
@@ -8,13 +9,16 @@ import os
 
 from datetime import datetime
 from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.stattools import adfuller, kpss
+from fbprophet import Prophet
 from dotenv import load_dotenv
 from icecream import ic
 
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 2000
-warnings.simplefilter(action="ignore", category=FutureWarning)
+plt.rcParams["figure.dpi"] = 150
+# warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
@@ -33,323 +37,141 @@ if __name__ == "__main__":
     gold.info()
     ic(gold.head())
 
-    df = gold["2000-1-1":"2011-12-31"]
+    df = gold.copy()["2000-1-1":"2011-12-31"]
     ic(df.head())
     df.rename(columns={"Value": "price"}, inplace=True)
-    df1 = df.resample("M").last()
-    # ic(f"Shape of DataFrame: {df.shape}")
-    # ic(df.head())
-    #
-    # WINDOW_SIZE = 12
-    # df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
-    # df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
-    # df.plot(title="Gold Price")
-    #
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im1.png", format="png", dpi=300)
+    df = df.resample("M").last()
+    ic(f"Shape of DataFrame: {df.shape}")
+    ic(df.head())
 
-    #
-    #
-    # # 4. Carry out seasonal decomposition using the multiplicative model:
-    #
-    # # In[10]:
-    #
-    #
-    # decomposition_results = seasonal_decompose(df.price,
-    #                                            model='multiplicative')
-    # decomposition_results.plot()                      .suptitle('Multiplicative Decomposition',
-    #                                fontsize=14)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch3_im2.png')
-    # plt.show()
-    #
-    #
-    # # ## Decomposing time series using Facebook's Prophet
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries and authenticate with Quandl:
-    #
-    # # In[19]:
-    #
-    #
-    # import pandas as pd
-    # import seaborn as sns
-    # import quandl
-    # from fbprophet import Prophet
-    #
-    # QUANDL_KEY = '{key}' # replace {key} with your own API key
-    # quandl.ApiConfig.api_key = QUANDL_KEY
-    #
-    #
-    # # 2. Download the daily gold prices and rename the columns:
-    #
-    # # In[12]:
-    #
-    #
-    # df = quandl.get(dataset='WGC/GOLD_DAILY_USD',
-    #                 start_date='2000-01-01',
-    #                 end_date='2005-12-31')
-    #
-    # df.reset_index(drop=False, inplace=True)
-    # df.rename(columns={'Date': 'ds', 'Value': 'y'}, inplace=True)
-    #
-    #
-    # # 3. Split the series into the training and test sets:
-    #
-    # # In[13]:
-    #
-    #
-    # train_indices = df.ds.apply(lambda x: x.year).values < 2005
-    # df_train = df.loc[train_indices].dropna()
-    # df_test = df.loc[~train_indices].reset_index(drop=True)
-    #
-    #
-    # # 4. Create the instance of the model and fit it to the data:
-    #
-    # # In[14]:
-    #
-    #
-    # model_prophet = Prophet(seasonality_mode='additive')
-    # model_prophet.add_seasonality(name='monthly', period=30.5, fourier_order=5)
-    # model_prophet.fit(df_train)
-    #
-    #
-    # # 5. Forecast the gold prices 1 year ahead and plot the results:
-    #
-    # # In[15]:
-    #
-    #
-    # df_future = model_prophet.make_future_dataframe(periods=365)
-    # df_pred = model_prophet.predict(df_future)
-    # model_prophet.plot(df_pred)
-    #
-    # plt.tight_layout()
-    # #plt.savefig('images/ch3_im3.png')
-    # plt.show()
-    #
-    #
-    # # 6. Inspect the decomposition of the time series:
-    #
-    # # In[16]:
-    #
-    #
-    # model_prophet.plot_components(df_pred)
-    #
-    # plt.tight_layout()
-    # #plt.savefig('images/ch3_im4.png')
-    # plt.show()
-    #
-    #
-    # # ### There's more...
-    #
-    # # 1. Merge the test set with the forecasts:
-    #
-    # # In[17]:
-    #
-    #
-    # selected_columns = ['ds', 'yhat_lower', 'yhat_upper', 'yhat']
-    #
-    # df_pred = df_pred.loc[:, selected_columns].reset_index(drop=True)
-    # df_test = df_test.merge(df_pred, on=['ds'], how='left')
-    # df_test.ds = pd.to_datetime(df_test.ds)
-    # df_test.set_index('ds', inplace=True)
-    #
-    #
-    # # 2. Plot the test values vs. predictions:
-    #
-    # # In[20]:
-    #
-    #
-    # fig, ax = plt.subplots(1, 1)
-    #
-    # ax = sns.lineplot(data=df_test[['y', 'yhat_lower',
-    #                                 'yhat_upper', 'yhat']])
-    # ax.fill_between(df_test.index,
-    #                 df_test.yhat_lower,
-    #                 df_test.yhat_upper,
-    #                 alpha=0.3)
-    # ax.set(title='Gold Price - actual vs. predicted',
-    #        xlabel='Date',
-    #        ylabel='Gold Price ($)')
-    #
-    # plt.tight_layout()
-    # #plt.savefig('images/ch3_im5.png')
-    # plt.show()
-    #
-    #
-    # # ## Testing for stationarity in time series
-    #
-    # # ### How to do it...
-    #
-    # # 0: Download the data:
-    #
-    # # In[21]:
-    #
-    #
-    # import pandas as pd
-    # import quandl
-    #
-    #
-    # # In[31]:
-    #
-    #
-    # QUANDL_KEY = '{key}' # replace {key} with your own API key
-    # quandl.ApiConfig.api_key = QUANDL_KEY
-    #
-    # df = quandl.get(dataset='WGC/GOLD_MONAVG_USD',
-    #                 start_date='2000-01-01',
-    #                 end_date='2011-12-31')
-    #
-    # df.rename(columns={'Value': 'price'}, inplace=True)
-    # df = df.resample('M').last()
-    #
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[23]:
-    #
-    #
-    # import pandas as pd
-    # from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-    # from statsmodels.tsa.stattools import adfuller, kpss
-    #
-    #
-    # # 2. Define a function for running the ADF test:
-    #
-    # # In[24]:
-    #
-    #
-    # def adf_test(x):
-    #     '''
-    #     Function for performing the Augmented Dickey-Fuller test for stationarity
-    #
-    #     Null Hypothesis: time series is not stationary
-    #     Alternate Hypothesis: time series is stationary
-    #
-    #     Parameters
-    #     ----------
-    #     x : pd.Series / np.array
-    #         The time series to be checked for stationarity
-    #
-    #     Returns
-    #     -------
-    #     results: pd.DataFrame
-    #         A DataFrame with the ADF test's results
-    #     '''
-    #
-    #     indices = ['Test Statistic', 'p-value',
-    #                '# of Lags Used', '# of Observations Used']
-    #
-    #     adf_test = adfuller(x, autolag='AIC')
-    #     results = pd.Series(adf_test[0:4], index=indices)
-    #
-    #     for key, value in adf_test[4].items():
-    #         results[f'Critical Value ({key})'] = value
-    #
-    #     return results
-    #
-    #
-    # # In[25]:
-    #
-    #
-    # adf_test(df.price)
-    #
-    #
-    # # 3. Define a function for running the KPSS test:
-    #
-    # # In[26]:
-    #
-    #
-    # def kpss_test(x, h0_type='c'):
-    #     '''
-    #     Function for performing the Kwiatkowski-Phillips-Schmidt-Shin test for stationarity
-    #
-    #     Null Hypothesis: time series is stationary
-    #     Alternate Hypothesis: time series is not stationary
-    #
-    #     Parameters
-    #     ----------
-    #     x: pd.Series / np.array
-    #         The time series to be checked for stationarity
-    #     h0_type: str{'c', 'ct'}
-    #         Indicates the null hypothesis of the KPSS test:
-    #             * 'c': The data is stationary around a constant(default)
-    #             * 'ct': The data is stationary around a trend
-    #
-    #     Returns
-    #     -------
-    #     results: pd.DataFrame
-    #         A DataFrame with the KPSS test's results
-    #     '''
-    #
-    #     indices = ['Test Statistic', 'p-value', '# of Lags']
-    #
-    #     kpss_test = kpss(x, regression=h0_type)
-    #     results = pd.Series(kpss_test[0:3], index=indices)
-    #
-    #     for key, value in kpss_test[3].items():
-    #         results[f'Critical Value ({key})'] = value
-    #
-    #     return results
-    #
-    #
-    # # In[27]:
-    #
-    #
-    # kpss_test(df.price)
-    #
-    #
-    # # 4. Generate the ACF/PACF plots:
-    #
-    # # In[28]:
-    #
-    #
-    # N_LAGS = 40
-    # SIGNIFICANCE_LEVEL = 0.05
-    #
-    # fig, ax = plt.subplots(2, 1)
-    # plot_acf(df.price, ax=ax[0], lags=N_LAGS,
-    #          alpha=SIGNIFICANCE_LEVEL)
-    # plot_pacf(df.price, ax=ax[1], lags=N_LAGS,
-    #           alpha=SIGNIFICANCE_LEVEL)
-    #
-    # plt.tight_layout()
-    # #plt.savefig('images/ch3_im8.png')
-    # plt.show()
-    #
-    #
-    # # ## Correcting for stationarity in time series
-    #
-    # # ### How to do it...
-    #
-    # # 0: Download the data:
-    #
-    # # In[3]:
-    #
-    #
-    # import pandas as pd
-    # import quandl
-    #
-    #
-    # # In[4]:
-    #
-    #
-    # QUANDL_KEY = '{key}' # replace {key} with your own API key
-    # quandl.ApiConfig.api_key = QUANDL_KEY
-    #
-    # df = quandl.get(dataset='WGC/GOLD_MONAVG_USD',
-    #                 start_date='2000-01-01',
-    #                 end_date='2011-12-31')
-    #
-    # df.rename(columns={'Value': 'price'}, inplace=True)
-    # df = df.resample('M').last()
-    #
-    #
-    # # 1. Import the libraries and update the inflation data:
-    #
-    # # In[5]:
+    WINDOW_SIZE = 12
+    df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
+    df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
+    df.plot(title="Gold Price")
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im1.png", format="png", dpi=300)
+
+    # 4. Carry out seasonal decomposition using the multiplicative model:
+    decomposition_results = seasonal_decompose(df.price, model="multiplicative")
+    decomposition_results.plot().suptitle("Multiplicative Decomposition", fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im2.png")
+    plt.close()
+
+    ## Decomposing time series using Facebook's Prophet
+    df = gold.copy()["2000-1-1":"2005-12-31"]
+    df.reset_index(drop=False, inplace=True)
+    df.rename(columns={"Date": "ds", "Value": "y"}, inplace=True)
+
+    train_indices = df.ds.apply(lambda x: x.year).values < 2005
+    df_train = df.loc[train_indices].dropna()
+    df_test = df.loc[~train_indices].reset_index(drop=True)
+
+    model_prophet = Prophet(seasonality_mode="additive", daily_seasonality=False)
+    model_prophet.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+    model_prophet.fit(df_train)
+
+    # 5. Forecast the gold prices 1 year ahead and plot the results:
+    df_future = model_prophet.make_future_dataframe(periods=365)
+    df_pred = model_prophet.predict(df_future)
+    model_prophet.plot(df_pred)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im3.png")
+    plt.close()
+
+    # 6. Inspect the decomposition of the time series:
+    model_prophet.plot_components(df_pred)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im4.png")
+
+    # 1. Merge the test set with the forecasts:
+    selected_columns = ["ds", "yhat_lower", "yhat_upper", "yhat"]
+    df_pred = df_pred.loc[:, selected_columns].reset_index(drop=True)
+    df_test = df_test.merge(df_pred, on=["ds"], how="left")
+    df_test.ds = pd.to_datetime(df_test.ds)
+    df_test.set_index("ds", inplace=True)
+
+    fig, ax = plt.subplots(1, 1)
+    ax = sns.lineplot(data=df_test[["y", "yhat_lower", "yhat_upper", "yhat"]])
+    ax.fill_between(df_test.index, df_test.yhat_lower, df_test.yhat_upper, alpha=0.3)
+    ax.set(title="Gold Price - actual vs. predicted", xlabel="Date", ylabel="Gold Price ($)")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im5.png")
+    plt.close()
+
+    ## Testing for stationarity in time series
+    df = gold.copy()["2000-1-1":"2011-12-31"]
+    df.rename(columns={"Value": "price"}, inplace=True)
+    df = df.resample("M").last()
+
+    def adf_test(x):
+        """
+        Function for performing the Augmented Dickey-Fuller test for stationarity
+        Null Hypothesis: time series is not stationary
+        Alternate Hypothesis: time series is stationary
+        Parameters
+        ----------
+        x : pd.Series / np.array
+            The time series to be checked for stationarity
+        Returns
+        -------
+        results: pd.DataFrame
+            A DataFrame with the ADF test's results
+        """
+
+        indices = ["Test Statistic", "p-value", "# of Lags Used", "# of Observations Used"]
+        adf_test = adfuller(x, autolag="AIC")
+        results = pd.Series(adf_test[0:4], index=indices)
+        for key, value in adf_test[4].items():
+            results[f"Critical Value ({key})"] = value
+        return results
+
+    def kpss_test(x, h0_type="c"):
+        """
+        Function for performing the Kwiatkowski-Phillips-Schmidt-Shin test for stationarity
+        Null Hypothesis: time series is stationary
+        Alternate Hypothesis: time series is not stationary
+        Parameters
+        ----------
+        x: pd.Series / np.array
+            The time series to be checked for stationarity
+        h0_type: str{'c', 'ct'}
+            Indicates the null hypothesis of the KPSS test:
+                * 'c': The data is stationary around a constant(default)
+                * 'ct': The data is stationary around a trend
+        Returns
+        -------
+        results: pd.DataFrame
+            A DataFrame with the KPSS test's results
+        """
+
+        indices = ["Test Statistic", "p-value", "# of Lags"]
+        kpss_test = kpss(x, regression=h0_type, nlags="auto")
+        results = pd.Series(kpss_test[0:3], index=indices)
+        for key, value in kpss_test[3].items():
+            results[f"Critical Value ({key})"] = value
+        return results
+
+    ic(adf_test(df.price))
+    ic(kpss_test(df.price))
+
+    N_LAGS = 40
+    SIGNIFICANCE_LEVEL = 0.05
+
+    fig, ax = plt.subplots(2, 1)
+    plot_acf(df.price, ax=ax[0], lags=N_LAGS, alpha=SIGNIFICANCE_LEVEL)
+    plot_pacf(df.price, ax=ax[1], lags=N_LAGS, alpha=SIGNIFICANCE_LEVEL)
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im8.png")
+    plt.close()
+
+    ## Correcting for stationarity in time series
+    df = gold.copy()["2000-1-1":"2011-12-31"]
+    df.rename(columns={"Value": "price"}, inplace=True)
+    df = df.resample("M").last()
     #
     #
     # import cpi
