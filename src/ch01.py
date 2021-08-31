@@ -152,13 +152,10 @@ if __name__ == "__main__":
 
     fig, ax = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
-    # add prices
     df.adj_close.plot(ax=ax[0])
     ax[0].set(title="MSFT time series", ylabel="Stock price ($)")
-    # add simple returns
     df.simple_rtn.plot(ax=ax[1])
     ax[1].set(ylabel="Simple returns (%)")
-    # add log returns
     df.log_rtn.plot(ax=ax[2])
     ax[2].set(xlabel="Date", ylabel="Log returns (%)")
     ax[2].tick_params(axis="x", which="major", labelsize=12)
@@ -175,8 +172,13 @@ if __name__ == "__main__":
     ic(df.head())
 
     df_rolling = df[["simple_rtn"]].rolling(window=21).agg(["mean", "std"])
-    df_rolling.columns = df_rolling.columns.droplevel()
+    ic(df_rolling)
+    ic(df_rolling.columns)
+    df_rolling.columns = df_rolling.columns.droplevel(0)
+    ic(df_rolling)
+    ic(df_rolling.columns)
     df_outliers = df.join(df_rolling)
+    ic(df_outliers)
 
     def indentify_outliers(row, n_sigmas=3):
         x = row["simple_rtn"]
@@ -187,9 +189,9 @@ if __name__ == "__main__":
         else:
             return 0
 
-    # 4. Identify the outliers and extract their values for later use:
     df_outliers["outlier"] = df_outliers.apply(indentify_outliers, axis=1)
     outliers = df_outliers.loc[df_outliers["outlier"] == 1, ["simple_rtn"]]
+    ic(outliers)
 
     fig, ax = plt.subplots()
     ax.plot(df_outliers.index, df_outliers.simple_rtn, color="blue", label="Normal")
@@ -213,7 +215,7 @@ if __name__ == "__main__":
     sigma = df.log_rtn.std()
     norm_pdf = scs.norm.pdf(r_range, loc=mu, scale=sigma)
 
-    fig, ax = plt.subplots(1, 2, figsize=(16, 8))
+    fig, ax = plt.subplots(1, 2, figsize=(8, 4))
     sns.distplot(df.log_rtn, kde=False, norm_hist=True, ax=ax[0])
     ax[0].set_title("Distribution of S&P 500 returns", fontsize=16)
     ax[0].plot(r_range, norm_pdf, "g", lw=2, label=f"N({mu:.2f}, {sigma**2:.4f})")
