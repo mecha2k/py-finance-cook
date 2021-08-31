@@ -233,13 +233,15 @@ if __name__ == "__main__":
             if order.status in [order.Completed]:
                 if order.isbuy():
                     self.log(
-                        f"BUY EXECUTED --- Price: {order.executed.price:.2f}, Cost: {order.executed.value:.2f}, Commission: {order.executed.comm:.2f}"
+                        f"BUY EXECUTED --- Price: {order.executed.price:.2f}, "
+                        f"Cost: {order.executed.value:.2f}, Commission: {order.executed.comm:.2f}"
                     )
                     self.price = order.executed.price
                     self.comm = order.executed.comm
                 else:
                     self.log(
-                        f"SELL EXECUTED --- Price: {order.executed.price:.2f}, Cost: {order.executed.value:.2f}, Commission: {order.executed.comm:.2f}"
+                        f"SELL EXECUTED --- Price: {order.executed.price:.2f}, "
+                        f"Cost: {order.executed.value:.2f}, Commission: {order.executed.comm:.2f}"
                     )
             # report failed order
             elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -259,7 +261,8 @@ if __name__ == "__main__":
                     size = int(self.broker.getcash() / self.datas[0].open)
                     # buy order
                     self.log(
-                        f"BUY CREATED --- Size: {size}, Cash: {self.broker.getcash():.2f}, Open: {self.data_open[0]}, Close: {self.data_close[0]}"
+                        f"BUY CREATED --- Size: {size}, Cash: {self.broker.getcash():.2f}, "
+                        f"Open: {self.data_open[0]}, Close: {self.data_close[0]}"
                     )
                     self.buy(size=size)
             else:
