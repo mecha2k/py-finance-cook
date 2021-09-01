@@ -1,4 +1,3 @@
-# import libraries
 import backtrader as bt
 import datetime
 import pandas as pd

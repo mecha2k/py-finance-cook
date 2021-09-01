@@ -62,7 +62,8 @@ ic(aapl.head())
 # print(f"Downloaded {df_intrinio.shape[0]} rows of data.")
 # ic(df_intrinio.head())
 #
-df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", progress=False)
+# df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", progress=False)
+df = aapl
 df = df.loc[:, ["Adj Close"]]
 df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
 
@@ -70,10 +71,16 @@ df["simple_rtn"] = df.adj_close.pct_change()
 df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
 ic(df.head())
 
-df_all_dates = pd.DataFrame(index=pd.date_range(start="1999-12-31", end="2010-12-31"))
-df = df_all_dates.join(df[["adj_close"]], how="left").fillna(method="ffill").asfreq("M")
+# df_all_dates = pd.DataFrame(index=pd.date_range(start="1999-12-31", end="2010-12-31", freq="D"))
+# df = df_all_dates.join(df["adj_close"], how="left").fillna(method="ffill").asfreq("M")
+df_all_dates = df["adj_close"].resample("M").mean()
+ic(df_all_dates["1999-12-31":"2010-12-31"])
 
+# ic(df_all_dates.join(df["adj_close"], how="left").head(10))
+# ic(df_all_dates.join(df[["adj_close"]], how="left").fillna(method="ffill"))
+# ic(df_all_dates.join(df[["adj_close"]], how="left").fillna(method="ffill").asfreq("M"))
 
+df = df_all_dates["1999-12-31":"2010-12-31"]
 # 3. Download inflation data from Quandl:
 df_cpi = quandl.get(dataset="RATEINF/CPI_USA", start_date="1999-12-01", end_date="2010-12-31")
 df_cpi.rename(columns={"Value": "cpi"}, inplace=True)
@@ -88,38 +95,38 @@ df_merged["inflation_rate"] = df_merged.cpi.pct_change()
 # 6. Adjust returns for inflation:
 df_merged["real_rtn"] = (df_merged.simple_rtn + 1) / (df_merged.inflation_rate + 1) - 1
 ic(df_merged.head())
-
-# ## Changing frequency
-df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", auto_adjust=False, progress=False)
-
-# keep only the adjusted close price
-df = df.loc[:, ["Adj Close"]]
-df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
-
-# calculate simple returns
-df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
-
-# remove redundant data
-df.drop("adj_close", axis=1, inplace=True)
-df.dropna(axis=0, inplace=True)
-ic(df.head())
-
-
-def realized_volatility(x):
-    return np.sqrt(np.sum(x ** 2))
-
-
-# 3. Calculate monthly realized volatility:
-df_rv = df.groupby(pd.Grouper(freq="M")).apply(realized_volatility)
-df_rv.rename(columns={"log_rtn": "rv"}, inplace=True)
-
-# 4. Annualize the values:
-df_rv.rv = df_rv.rv * np.sqrt(12)
-fig, ax = plt.subplots(2, 1, sharex=True)
-ax[0].plot(df)
-ax[1].plot(df_rv)
-plt.tight_layout()
-plt.savefig("images/ch1_im6.png")
+#
+# # ## Changing frequency
+# df = yf.download("AAPL", start="2000-01-01", end="2010-12-31", auto_adjust=False, progress=False)
+#
+# # keep only the adjusted close price
+# df = df.loc[:, ["Adj Close"]]
+# df.rename(columns={"Adj Close": "adj_close"}, inplace=True)
+#
+# # calculate simple returns
+# df["log_rtn"] = np.log(df.adj_close / df.adj_close.shift(1))
+#
+# # remove redundant data
+# df.drop("adj_close", axis=1, inplace=True)
+# df.dropna(axis=0, inplace=True)
+# ic(df.head())
+#
+#
+# def realized_volatility(x):
+#     return np.sqrt(np.sum(x ** 2))
+#
+#
+# # 3. Calculate monthly realized volatility:
+# df_rv = df.groupby(pd.Grouper(freq="M")).apply(realized_volatility)
+# df_rv.rename(columns={"log_rtn": "rv"}, inplace=True)
+#
+# # 4. Annualize the values:
+# df_rv.rv = df_rv.rv * np.sqrt(12)
+# fig, ax = plt.subplots(2, 1, sharex=True)
+# ax[0].plot(df)
+# ax[1].plot(df_rv)
+# plt.tight_layout()
+# plt.savefig("images/ch1_im6.png")
 
 # # download data as pandas DataFrame
 # df = yf.download("MSFT", auto_adjust=False, progress=False)
