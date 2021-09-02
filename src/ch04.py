@@ -35,7 +35,6 @@ if __name__ == "__main__":
     df = capm["2014-1":"2018-12"]
     df.info()
     ic(df.head())
-
     X = (
         df["Adj Close"]
         .rename(columns={"AMZN": "asset", "^GSPC": "market"})
