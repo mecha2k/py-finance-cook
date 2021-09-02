@@ -187,105 +187,107 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im8.png")
     plt.close()
 
-    # ## Correcting for stationarity in time series
-    # df = gold.copy()["2000-1-1":"2011-12-31"]
-    # df.rename(columns={"Value": "price"}, inplace=True)
-    # df = df.resample("M").last()
-    #
-    # def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
-    #     """
-    #     Function for testing the stationarity of a series by using:
-    #     * the ADF test
-    #     * the KPSS test
-    #     * ACF/PACF plots
-    #     Parameters
-    #     ----------
-    #     x: pd.Series / np.array
-    #         The time series to be checked for stationarity
-    #     n_lags : int
-    #         The number of lags for the ACF/PACF plots
-    #     alpha : float
-    #         Significance level for the ACF/PACF plots
-    #     h0_type: str{'c', 'ct'}
-    #         Indicates the null hypothesis of the KPSS test:
-    #             * 'c': The data is stationary around a constant(default)
-    #             * 'ct': The data is stationary around a trend
-    #     Returns
-    #     -------
-    #     fig : matplotlib.figure.Figure
-    #         Figure containing the ACF/PACF plot
-    #     """
-    #
-    #     adf_results = adf_test(x)
-    #     kpss_results = kpss_test(x, h0_type=h0_type)
-    #     print(
-    #         "ADF test statistic: {:.2f} (p-val: {:.2f})".format(
-    #             adf_results["Test Statistic"], adf_results["p-value"]
-    #         )
-    #     )
-    #     print(
-    #         "KPSS test statistic: {:.2f} (p-val: {:.2f})".format(
-    #             kpss_results["Test Statistic"], kpss_results["p-value"]
-    #         )
-    #     )
-    #     fig, ax = plt.subplots(2, figsize=(8, 4))
-    #     plot_acf(x, ax=ax[0], lags=n_lags, alpha=alpha)
-    #     plot_pacf(x, ax=ax[1], lags=n_lags, alpha=alpha)
-    #     return fig
-    #
+    ## Correcting for stationarity in time series
+    df = gold.copy()["2000-1-1":"2011-12-31"]
+    df.rename(columns={"Value": "price"}, inplace=True)
+    df = df.resample("M").last()
+
+    def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
+        """
+        Function for testing the stationarity of a series by using:
+        * the ADF test
+        * the KPSS test
+        * ACF/PACF plots
+        Parameters
+        ----------
+        x: pd.Series / np.array
+            The time series to be checked for stationarity
+        n_lags : int
+            The number of lags for the ACF/PACF plots
+        alpha : float
+            Significance level for the ACF/PACF plots
+        h0_type: str{'c', 'ct'}
+            Indicates the null hypothesis of the KPSS test:
+                * 'c': The data is stationary around a constant(default)
+                * 'ct': The data is stationary around a trend
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Figure containing the ACF/PACF plot
+        """
+
+        adf_results = adf_test(x)
+        kpss_results = kpss_test(x, h0_type=h0_type)
+        print(
+            "ADF test statistic: {:.2f} (p-val: {:.2f})".format(
+                adf_results["Test Statistic"], adf_results["p-value"]
+            )
+        )
+        print(
+            "KPSS test statistic: {:.2f} (p-val: {:.2f})".format(
+                kpss_results["Test Statistic"], kpss_results["p-value"]
+            )
+        )
+        fig, ax = plt.subplots(2, figsize=(8, 4))
+        plot_acf(x, ax=ax[0], lags=n_lags, alpha=alpha)
+        plot_pacf(x, ax=ax[1], lags=n_lags, alpha=alpha)
+        return fig
+
+    import cpi
+
     # # update the CPI data (if needed)
     # # cpi.update()
-    #
-    # # 2. Deflate the gold prices (to 2011-12-31 USD values) and plot the results:
-    # DEFL_DATE = date(2011, 12, 31)
-    # df["dt_index"] = df.index.map(lambda x: x.to_pydatetime().date())
-    # df["price_deflated"] = df.apply(lambda x: cpi.inflate(x.price, x.dt_index, DEFL_DATE), axis=1)
-    # df[["price", "price_deflated"]].plot(title="Gold Price (deflated)")
-    #
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im9.png")
-    #
-    # # 3. Deflate the series using natural logarithm and plot it together with the rolling metrics:
-    # WINDOW = 12
-    # selected_columns = ["price_log", "rolling_mean_log", "rolling_std_log"]
-    # df["price_log"] = np.log(df.price_deflated)
-    # df["rolling_mean_log"] = df.price_log.rolling(WINDOW).mean()
-    # df["rolling_std_log"] = df.price_log.rolling(WINDOW).std()
-    #
-    # df[selected_columns].plot(title="Gold Price (logged)")
-    #
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im10.png")
-    # plt.close()
-    #
-    # # 4. Use the `test_autocorrelation` (helper function for this chapter) to investigate if the series became stationary:
-    # fig = test_autocorrelation(df.price_log)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im11.png")
-    # plt.close()
-    #
-    # # 5. Apply differencing to the series and plot the results:
-    # selected_columns = ["price_log_diff", "roll_mean_log_diff", "roll_std_log_diff"]
-    # df["price_log_diff"] = df.price_log.diff(1)
-    # df["roll_mean_log_diff"] = df.price_log_diff.rolling(WINDOW).mean()
-    # df["roll_std_log_diff"] = df.price_log_diff.rolling(WINDOW).std()
-    # df[selected_columns].plot(title="Gold Price (1st differences)")
-    #
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im12.png")
-    # plt.close()
-    #
-    # # 6. Test if the series became stationary:
-    # fig = test_autocorrelation(df.price_log_diff.dropna())
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im13.png")
-    #
-    # ic(f"Suggested # of differences (ADF): {ndiffs(df.price, test='adf')}")
-    # ic(f"Suggested # of differences (KPSS): {ndiffs(df.price, test='kpss')}")
-    # ic(f"Suggested # of differences (PP): {ndiffs(df.price, test='pp')}")
-    # ic(f"Suggested # of differences (OSCB): {nsdiffs(df.price, m=12, test='ocsb')}")
-    # ic(f"Suggested # of differences (CH): {nsdiffs(df.price, m=12, test='ch')}")
-    #
+
+    # 2. Deflate the gold prices (to 2011-12-31 USD values) and plot the results:
+    DEFL_DATE = date(2011, 12, 31)
+    df["dt_index"] = df.index.map(lambda x: x.to_pydatetime().date())
+    df["price_deflated"] = df.apply(lambda x: cpi.inflate(x.price, x.dt_index, DEFL_DATE), axis=1)
+    df[["price", "price_deflated"]].plot(title="Gold Price (deflated)")
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im9.png")
+
+    # 3. Deflate the series using natural logarithm and plot it together with the rolling metrics:
+    WINDOW = 12
+    selected_columns = ["price_log", "rolling_mean_log", "rolling_std_log"]
+    df["price_log"] = np.log(df.price_deflated)
+    df["rolling_mean_log"] = df.price_log.rolling(WINDOW).mean()
+    df["rolling_std_log"] = df.price_log.rolling(WINDOW).std()
+
+    df[selected_columns].plot(title="Gold Price (logged)")
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im10.png")
+    plt.close()
+
+    # 4. Use the `test_autocorrelation` (helper function for this chapter) to investigate if the series became stationary:
+    fig = test_autocorrelation(df.price_log)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im11.png")
+    plt.close()
+
+    # 5. Apply differencing to the series and plot the results:
+    selected_columns = ["price_log_diff", "roll_mean_log_diff", "roll_std_log_diff"]
+    df["price_log_diff"] = df.price_log.diff(1)
+    df["roll_mean_log_diff"] = df.price_log_diff.rolling(WINDOW).mean()
+    df["roll_std_log_diff"] = df.price_log_diff.rolling(WINDOW).std()
+    df[selected_columns].plot(title="Gold Price (1st differences)")
+
+    plt.tight_layout()
+    plt.savefig("images/ch3_im12.png")
+    plt.close()
+
+    # 6. Test if the series became stationary:
+    fig = test_autocorrelation(df.price_log_diff.dropna())
+    plt.tight_layout()
+    plt.savefig("images/ch3_im13.png")
+
+    ic(f"Suggested # of differences (ADF): {ndiffs(df.price, test='adf')}")
+    ic(f"Suggested # of differences (KPSS): {ndiffs(df.price, test='kpss')}")
+    ic(f"Suggested # of differences (PP): {ndiffs(df.price, test='pp')}")
+    ic(f"Suggested # of differences (OSCB): {nsdiffs(df.price, m=12, test='ocsb')}")
+    ic(f"Suggested # of differences (CH): {nsdiffs(df.price, m=12, test='ch')}")
+
     # ## Modeling time series with exponential smoothing methods
     # plt.set_cmap("cubehelix")
     # sns.set_palette("cubehelix")
