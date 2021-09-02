@@ -53,73 +53,73 @@ if __name__ == "__main__":
     gold.info()
     gold_day.info()
 
-    # df = gold.copy()["2000-1":"2011-12"]
-    # ic(df.head())
-    # df.rename(columns={"Value": "price"}, inplace=True)
-    # df = df.resample("M").last()
-    # ic(f"Shape of DataFrame: {df.shape}")
-    # ic(df.head())
-    #
-    # WINDOW_SIZE = 12
-    # df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
-    # df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
-    # df.plot(title="Gold Price")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im1.png", format="png", dpi=300)
-    #
-    # # 4. Carry out seasonal decomposition using the multiplicative model:
-    # decomposition_results = seasonal_decompose(df.price, model="multiplicative")
-    # decomposition_results.plot().suptitle("Multiplicative Decomposition", fontsize=14)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im2.png")
-    # plt.close()
+    df = gold.copy()["2000-1":"2011-12"]
+    ic(df.head())
+    df.rename(columns={"Value": "price"}, inplace=True)
+    df = df.resample("M").last()
+    ic(f"Shape of DataFrame: {df.shape}")
+    ic(df.head())
 
-    ## Decomposing time series using Facebook's Prophet
-    # df = gold_day.copy()["2000-1":"2005-12"]
-    # df.reset_index(drop=False, inplace=True)
-    # df.rename(columns={"Date": "ds", "Value": "y"}, inplace=True)
-    # ic(df)
-    #
-    # train_indices = df.ds.apply(lambda x: x.year).values < 2005
-    # ic(train_indices)
-    # df_train = df.loc[train_indices].dropna()
-    # df_test = df.loc[~train_indices].reset_index(drop=True)
-    # ic(df_train)
-    # ic(df_test)
-    #
-    # model_prophet = Prophet(seasonality_mode="additive", daily_seasonality=False)
-    # model_prophet.add_seasonality(name="monthly", period=30.5, fourier_order=5)
-    # model_prophet.fit(df_train)
-    #
-    # # 5. Forecast the gold prices 1 year ahead and plot the results:
-    # df_future = model_prophet.make_future_dataframe(periods=365)
-    # ic(df_future.tail())
-    # df_pred = model_prophet.predict(df_future)
-    # ic(df_pred[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail())
-    # model_prophet.plot(df_pred)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im3.png")
-    #
-    # # 6. Inspect the decomposition of the time series:
-    # model_prophet.plot_components(df_pred)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im4.png")
-    # plt.close()
-    #
-    # # 1. Merge the test set with the forecasts:
-    # selected_columns = ["ds", "yhat_lower", "yhat_upper", "yhat"]
-    # df_pred = df_pred.loc[:, selected_columns].reset_index(drop=True)
-    # df_test = df_test.merge(df_pred, on=["ds"], how="left")
-    # df_test.ds = pd.to_datetime(df_test.ds)
-    # df_test.set_index("ds", inplace=True)
-    #
-    # fig, ax = plt.subplots(1, 1)
-    # ax = sns.lineplot(data=df_test[["y", "yhat_lower", "yhat_upper", "yhat"]])
-    # ax.fill_between(df_test.index, df_test.yhat_lower, df_test.yhat_upper, alpha=0.3)
-    # ax.set(title="Gold Price - actual vs. predicted", xlabel="Date", ylabel="Gold Price ($)")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im5.png")
-    # plt.close()
+    WINDOW_SIZE = 12
+    df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
+    df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
+    df.plot(title="Gold Price")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im1.png", format="png", dpi=300)
+
+    # 4. Carry out seasonal decomposition using the multiplicative model:
+    decomposition_results = seasonal_decompose(df.price, model="multiplicative")
+    decomposition_results.plot().suptitle("Multiplicative Decomposition", fontsize=14)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im2.png")
+    plt.close()
+
+    # Decomposing time series using Facebook's Prophet
+    df = gold_day.copy()["2000-1":"2005-12"]
+    df.reset_index(drop=False, inplace=True)
+    df.rename(columns={"Date": "ds", "Value": "y"}, inplace=True)
+    ic(df)
+
+    train_indices = df.ds.apply(lambda x: x.year).values < 2005
+    ic(train_indices)
+    df_train = df.loc[train_indices].dropna()
+    df_test = df.loc[~train_indices].reset_index(drop=True)
+    ic(df_train)
+    ic(df_test)
+
+    model_prophet = Prophet(seasonality_mode="additive", daily_seasonality=False)
+    model_prophet.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+    model_prophet.fit(df_train)
+
+    # 5. Forecast the gold prices 1 year ahead and plot the results:
+    df_future = model_prophet.make_future_dataframe(periods=365)
+    ic(df_future.tail())
+    df_pred = model_prophet.predict(df_future)
+    ic(df_pred[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail())
+    model_prophet.plot(df_pred)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im3.png")
+
+    # 6. Inspect the decomposition of the time series:
+    model_prophet.plot_components(df_pred)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im4.png")
+    plt.close()
+
+    # 1. Merge the test set with the forecasts:
+    selected_columns = ["ds", "yhat_lower", "yhat_upper", "yhat"]
+    df_pred = df_pred.loc[:, selected_columns].reset_index(drop=True)
+    df_test = df_test.merge(df_pred, on=["ds"], how="left")
+    df_test.ds = pd.to_datetime(df_test.ds)
+    df_test.set_index("ds", inplace=True)
+
+    fig, ax = plt.subplots(1, 1)
+    ax = sns.lineplot(data=df_test[["y", "yhat_lower", "yhat_upper", "yhat"]])
+    ax.fill_between(df_test.index, df_test.yhat_lower, df_test.yhat_upper, alpha=0.3)
+    ax.set(title="Gold Price - actual vs. predicted", xlabel="Date", ylabel="Gold Price ($)")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im5.png")
+    plt.close()
 
     ## Testing for stationarity in time series
     df = gold.copy()["2000-1-1":"2011-12-31"]

@@ -9,11 +9,11 @@ from datetime import datetime
 from icecream import ic
 from plotly.offline import iplot, init_notebook_mode
 
-plt.style.use("default")
+# plt.style.use("default")
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 2000
-warnings.simplefilter(action="ignore", category=FutureWarning)
+plt.rcParams["figure.dpi"] = 150
+# warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 if __name__ == "__main__":
@@ -152,53 +152,53 @@ if __name__ == "__main__":
     cerebro.run()
     print(f"Final Portfolio Value: {cerebro.broker.getvalue():.2f}")
 
-    class SmaStrategy1(bt.Strategy):
-        params = (("ma_period", 20),)
-
-        def __init__(self):
-            # keep track of close price in the series
-            self.data_close = self.datas[0].close
-            # keep track of pending orders
-            self.order = None
-            # add a simple moving average indicator
-            self.sma = bt.ind.SMA(self.datas[0], period=self.params.ma_period)
-
-        def log(self, txt):
-            """Logging function"""
-            dt = self.datas[0].datetime.date(0).isoformat()
-            print(f"{dt}, {txt}")
-
-        def notify_order(self, order):
-            # set no pending order
-            self.order = None
-
-        def next(self):
-            # do nothing if an order is pending
-            if self.order:
-                return
-            # check if there is already a position
-            if not self.position:
-                # buy condition
-                if self.data_close[0] > self.sma[0]:
-                    self.order = self.buy()
-            else:
-                # sell condition
-                if self.data_close[0] < self.sma[0]:
-                    self.order = self.sell()
-
-        def stop(self):
-            self.log(
-                f"(ma_period = {self.params.ma_period:2d}) --- Terminal Value: {self.broker.getvalue():.2f}"
-            )
-
-    cerebro = bt.Cerebro(stdstats=False)
-    cerebro.adddata(data)
-    cerebro.optstrategy(SmaStrategy1, ma_period=range(10, 31))
-    cerebro.broker.setcash(1000.0)
-    cerebro.run(maxcpus=8)
+    # class SmaStrategy1(bt.Strategy):
+    #     params = (("ma_period", 20),)
+    #
+    #     def __init__(self):
+    #         # keep track of close price in the series
+    #         self.data_close = self.datas[0].close
+    #         # keep track of pending orders
+    #         self.order = None
+    #         # add a simple moving average indicator
+    #         self.sma = bt.ind.SMA(self.datas[0], period=self.params.ma_period)
+    #
+    #     def log(self, txt):
+    #         """Logging function"""
+    #         dt = self.datas[0].datetime.date(0).isoformat()
+    #         print(f"{dt}, {txt}")
+    #
+    #     def notify_order(self, order):
+    #         # set no pending order
+    #         self.order = None
+    #
+    #     def next(self):
+    #         # do nothing if an order is pending
+    #         if self.order:
+    #             return
+    #         # check if there is already a position
+    #         if not self.position:
+    #             # buy condition
+    #             if self.data_close[0] > self.sma[0]:
+    #                 self.order = self.buy()
+    #         else:
+    #             # sell condition
+    #             if self.data_close[0] < self.sma[0]:
+    #                 self.order = self.sell()
+    #
+    #     def stop(self):
+    #         self.log(
+    #             f"(ma_period = {self.params.ma_period:2d}) --- Terminal Value: {self.broker.getvalue():.2f}"
+    #         )
+    #
+    # cerebro = bt.Cerebro(stdstats=False)
+    # cerebro.adddata(data)
+    # cerebro.optstrategy(SmaStrategy1, ma_period=range(10, 31))
+    # cerebro.broker.setcash(1000.0)
+    # cerebro.run()
 
     ## Calculating Bollinger Bands and testing a buy/sell strategy
-    class BBand_Strategy(bt.Strategy):
+    class BBandStrategy(bt.Strategy):
         params = (
             ("period", 20),
             ("devfactor", 2.0),
@@ -271,7 +271,7 @@ if __name__ == "__main__":
                     self.sell(size=self.position.size)
 
     cerebro = bt.Cerebro(stdstats=False, cheat_on_open=True)
-    cerebro.addstrategy(BBand_Strategy)
+    cerebro.addstrategy(BBandStrategy)
     cerebro.adddata(data)
     cerebro.broker.setcash(10000.0)
     cerebro.broker.setcommission(commission=0.001)
