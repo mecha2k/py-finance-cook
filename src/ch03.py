@@ -288,35 +288,33 @@ if __name__ == "__main__":
     ic(f"Suggested # of differences (OSCB): {nsdiffs(df.price, m=12, test='ocsb')}")
     ic(f"Suggested # of differences (CH): {nsdiffs(df.price, m=12, test='ch')}")
 
-    # ## Modeling time series with exponential smoothing methods
-    # plt.set_cmap("cubehelix")
-    # sns.set_palette("cubehelix")
-    # COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
-    #
-    # src_data = "data/yf_google.pkl"
-    # start = datetime(2000, 1, 1)
-    # end = datetime(2020, 12, 31)
-    # try:
-    #     goog = pd.read_pickle(src_data)
-    #     print("data reading from file...")
-    # except FileNotFoundError:
-    #     goog = yf.download("GOOG", start=start, end=end, adjusted=True)
-    #     goog.to_pickle(src_data)
-    #
-    # df = goog.copy()["2010-1":"2018-12"]
-    # ic(f"Downloaded {df.shape[0]} rows of data.")
-    #
-    # goog = df.resample("M").last().rename(columns={"Adj Close": "adj_close"}).adj_close
-    #
-    # train_indices = goog.index.year < 2018
-    # goog_train = goog[train_indices]
-    # goog_test = goog[~train_indices]
-    # test_length = len(goog_test)
-    #
-    # goog.plot(title="Google's Stock Price")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im14.png")
-    #
+    ## Modeling time series with exponential smoothing methods
+    plt.set_cmap("cubehelix")
+    sns.set_palette("cubehelix")
+    COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
+
+    src_data = "data/yf_google.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        goog = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        goog = yf.download("GOOG", start=start, end=end, adjusted=True)
+        goog.to_pickle(src_data)
+    df = goog.copy()["2010-1":"2018-12"]
+    ic(f"Downloaded {df.shape[0]} rows of data.")
+    goog = df.resample("M").last().rename(columns={"Adj Close": "adj_close"}).adj_close
+
+    train_indices = goog.index.year < 2018
+    goog_train = goog[train_indices]
+    goog_test = goog[~train_indices]
+    test_length = len(goog_test)
+
+    goog.plot(title="Google's Stock Price")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im14.png")
+
     # # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
     # ses_1 = SimpleExpSmoothing(goog_train).fit(smoothing_level=0.2)
     # ses_forecast_1 = ses_1.forecast(test_length)
@@ -325,7 +323,7 @@ if __name__ == "__main__":
     # ses_3 = SimpleExpSmoothing(goog_train).fit()
     # alpha = ses_3.model.params["smoothing_level"]
     # ses_forecast_3 = ses_3.forecast(test_length)
-    #
+
     # # 7. Plot the original prices together with the models' results:
     # goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
     # ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
@@ -337,7 +335,7 @@ if __name__ == "__main__":
     # plt.tight_layout()
     # plt.savefig("images/ch3_im15.png")
     # plt.close()
-    #
+
     # # Holt's model with linear trend
     # hs_1 = Holt(goog_train).fit()
     # hs_forecast_1 = hs_1.forecast(test_length)
@@ -353,19 +351,15 @@ if __name__ == "__main__":
     #
     # # 9. Plot the original prices together with the models' results:
     # goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
-    #
     # hs_1.fittedvalues.plot(color=COLORS[1])
     # hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
-    #
     # hs_2.fittedvalues.plot(color=COLORS[2])
     # hs_forecast_2.plot(color=COLORS[2], legend=True, label="Exponential trend")
-    #
     # hs_3.fittedvalues.plot(color=COLORS[3])
     # hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
-    #
     # plt.tight_layout()
     # plt.savefig("images/ch3_im16.png")
-    #
+
     # SEASONAL_PERIODS = 12
     #
     # # Holt-Winter's model with exponential trend
