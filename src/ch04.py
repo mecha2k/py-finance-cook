@@ -12,7 +12,7 @@ from datetime import date, datetime
 from dotenv import load_dotenv
 from icecream import ic
 
-plt.style.use("seaborn-colorblind")
+plt.style.use("seaborn")
 plt.rcParams["figure.figsize"] = [8, 5]
 plt.rcParams["figure.dpi"] = 150
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -55,35 +55,26 @@ if __name__ == "__main__":
     capm_model = sm.OLS(y, X).fit()
     ic(capm_model.summary())
 
-    # # #### Risk-free rate (13 Week Treasury Bill)
-    #
-    # # In[9]:
-    #
-    #
-    # # period lenght in days
-    # N_DAYS = 90
-    #
-    # # download data from Yahoo finance
-    # df_rf = yf.download('^IRX',
-    #                     start=START_DATE,
-    #                     end=END_DATE,
-    #                     progress=False)
-    #
-    # # resample to monthly by taking last value from each month
-    # rf = df_rf.resample('M').last().Close / 100
-    #
-    # # calculate the corresponding daily risk-free return
-    # rf = ( 1 / (1 - rf * N_DAYS / 360) )**(1 / N_DAYS)
-    #
-    # # convert to monthly and subtract 1
-    # rf = (rf ** 30) - 1
-    #
-    # # plot the risk-free rate
-    # rf.plot(title='Risk-free rate (13 Week Treasury Bill)')
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch4_im2.png')
-    # plt.show()
+    #### Risk-free rate (13 Week Treasury Bill)
+    N_DAYS = 90
+    src_data = "data/yf_irx.pkl"
+    try:
+        irx = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        irx = yf.download("^IRX", start=start, end=end, adjusted=True, progress=False)
+        irx.to_pickle(src_data)
+
+    df_rf = irx["2014":"2018"]
+    rf = df_rf.resample("M").last().Close / 100
+    # calculate the corresponding daily risk-free return
+    rf = (1 / (1 - rf * N_DAYS / 360)) ** (1 / N_DAYS)
+    # convert to monthly and subtract 1
+    rf = (rf ** 30) - 1
+
+    rf.plot(title="Risk-free rate (13 Week Treasury Bill)")
+    plt.tight_layout()
+    plt.savefig("images/ch4_im2.png")
 
 
 # # #### Risk-free rate (3-Month Treasury Bill)
