@@ -11,9 +11,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-
-src/data
-src/images
 src/choromedriver
 
 .DS_Store
