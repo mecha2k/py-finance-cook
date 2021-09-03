@@ -281,6 +281,7 @@ if __name__ == "__main__":
     fig = test_autocorrelation(df.price_log_diff.dropna())
     plt.tight_layout()
     plt.savefig("images/ch3_im13.png")
+    plt.close()
 
     ic(f"Suggested # of differences (ADF): {ndiffs(df.price, test='adf')}")
     ic(f"Suggested # of differences (KPSS): {ndiffs(df.price, test='kpss')}")
@@ -314,6 +315,7 @@ if __name__ == "__main__":
     goog.plot(title="Google's Stock Price")
     plt.tight_layout()
     plt.savefig("images/ch3_im14.png")
+    plt.close()
 
     # # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
     # ses_1 = SimpleExpSmoothing(goog_train).fit(smoothing_level=0.2)
