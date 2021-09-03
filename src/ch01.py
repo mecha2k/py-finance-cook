@@ -25,7 +25,8 @@ load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
 plt.style.use("seaborn")
-plt.rcParams["figure.dpi"] = 300
+plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.figsize"] = [8, 5]
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 # 2. Authenticate using the personal API key and select the API:

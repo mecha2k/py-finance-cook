@@ -235,7 +235,7 @@ if __name__ == "__main__":
     import cpi
 
     # update the CPI data (if needed)
-    cpi.update()
+    # cpi.update()
 
     # 2. Deflate the gold prices (to 2011-12-31 USD values) and plot the results:
     DEFL_DATE = date(2011, 12, 31)
@@ -259,7 +259,9 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im10.png")
     plt.close()
 
-    # 4. Use the `test_autocorrelation` (helper function for this chapter) to investigate if the series became stationary:
+    # 4. Use the `test_autocorrelation` (helper function for this chapter)
+    # to investigate if the series became stationary:
+    plt.clf()
     fig = test_autocorrelation(df.price_log)
     plt.tight_layout()
     plt.savefig("images/ch3_im11.png")
@@ -270,17 +272,16 @@ if __name__ == "__main__":
     df["price_log_diff"] = df.price_log.diff(1)
     df["roll_mean_log_diff"] = df.price_log_diff.rolling(WINDOW).mean()
     df["roll_std_log_diff"] = df.price_log_diff.rolling(WINDOW).std()
-    df[selected_columns].plot(title="Gold Price (1st differences)")
 
+    plt.clf()
+    df[selected_columns].plot(title="Gold Price (1st differences)")
     plt.tight_layout()
     plt.savefig("images/ch3_im12.png")
-    plt.close()
 
     # 6. Test if the series became stationary:
     fig = test_autocorrelation(df.price_log_diff.dropna())
     plt.tight_layout()
     plt.savefig("images/ch3_im13.png")
-    plt.close()
 
     ic(f"Suggested # of differences (ADF): {ndiffs(df.price, test='adf')}")
     ic(f"Suggested # of differences (KPSS): {ndiffs(df.price, test='kpss')}")
@@ -311,25 +312,28 @@ if __name__ == "__main__":
     goog_test = goog[~train_indices]
     test_length = len(goog_test)
 
+    plt.clf()
     goog.plot(title="Google's Stock Price")
     plt.tight_layout()
     plt.savefig("images/ch3_im14.png")
-    plt.close()
 
     # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
     ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
         smoothing_level=0.2
     )
-    ses_forecast_1 = ses_1.forecast(test_length)
+    ses_forecast_1 = ses_1.forecast(steps=test_length)
     ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
         smoothing_level=0.5
     )
-    ses_forecast_2 = ses_2.forecast(test_length)
-    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit()
+    ses_forecast_2 = ses_2.forecast(steps=test_length)
+    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=None
+    )
     alpha = ses_3.model.params["smoothing_level"]
-    ses_forecast_3 = ses_3.forecast(test_length)
+    ses_forecast_3 = ses_3.forecast(steps=test_length)
 
     # 7. Plot the original prices together with the models' results:
+    plt.clf()
     goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
     ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
     ses_1.fittedvalues.plot(color=COLORS[1])
@@ -353,6 +357,7 @@ if __name__ == "__main__":
     hs_forecast_3 = hs_3.forecast(test_length)
 
     # 9. Plot the original prices together with the models' results:
+    plt.clf()
     goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
     hs_1.fittedvalues.plot(color=COLORS[1])
     hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
@@ -362,7 +367,6 @@ if __name__ == "__main__":
     hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
     plt.tight_layout()
     plt.savefig("images/ch3_im16.png")
-    plt.close()
 
     SEASONAL_PERIODS = 12
     # Holt-Winter's model with exponential trend
@@ -376,18 +380,18 @@ if __name__ == "__main__":
     ).fit()
     hw_forecast_2 = hw_2.forecast(test_length)
 
+    plt.clf()
     goog.plot(
         color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
     )
     hw_1.fittedvalues.plot(color=COLORS[1])
     hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
-    phi = hw_2.model.params["damping_slope"]
+    phi = hw_2.model.params["damping_trend"]
     plot_label = f"Seasonal Smoothing (damped with $\phi={phi:.4f}$)"
     hw_2.fittedvalues.plot(color=COLORS[2])
     hw_forecast_2.plot(color=COLORS[2], legend=True, label=plot_label)
     plt.tight_layout()
     plt.savefig("images/ch3_im17.png")
-    plt.close()
 
     ## Modeling time series with ARIMA class models
     src_data = "data/yf_google.pkl"
@@ -401,7 +405,7 @@ if __name__ == "__main__":
         goog.to_pickle(src_data)
     df = goog.copy()["2015-1":"2018-12"]
     goog = df.resample("W").last().rename(columns={"Adj Close": "adj_close"}).adj_close
-    goog_diff = goog.diff().dropna()
+    goog_diff = goog.diff(periods=1).dropna()
 
     fig, ax = plt.subplots(2, sharex=True)
     goog.plot(title="Google's stock price", ax=ax[0])
@@ -411,10 +415,9 @@ if __name__ == "__main__":
     fig = test_autocorrelation(goog_diff)
     plt.tight_layout()
     plt.savefig("images/ch3_im19.png")
-    plt.close()
 
     arima = ARIMA(goog, order=(2, 1, 1)).fit(disp=0)
-    arima.summary()
+    ic(arima.summary())
 
     def arima_diagnostics(resids, n_lags=40):
         """
@@ -448,7 +451,7 @@ if __name__ == "__main__":
         ax2.set_title("Distribution of standardized residuals")
         ax2.set_xlim(x_lim)
         ax2.legend()
-        sm.qqplot(resids_nonmissing, line="s", ax=ax3)
+        sm.qqplot(resids_nonmissing, marker="o", line="s", ax=ax3)
         ax3.set_title("Q-Q plot")
         plot_acf(resids, ax=ax4, lags=n_lags, alpha=0.05)
         ax4.set_title("ACF plot")
