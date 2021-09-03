@@ -26,13 +26,12 @@ from icecream import ic
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
 plt.rcParams["figure.dpi"] = 150
-# warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
 if __name__ == "__main__":
-    # the prices of gold for years 2000-2011 and resample to monthly values:
     src_data = "data/qd_gold.pkl"
     start = datetime(2000, 1, 1)
     end = datetime(2020, 12, 31)
@@ -235,8 +234,8 @@ if __name__ == "__main__":
 
     import cpi
 
-    # # update the CPI data (if needed)
-    # # cpi.update()
+    # update the CPI data (if needed)
+    cpi.update()
 
     # 2. Deflate the gold prices (to 2011-12-31 USD values) and plot the results:
     DEFL_DATE = date(2011, 12, 31)
@@ -317,229 +316,216 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im14.png")
     plt.close()
 
-    # # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
-    # ses_1 = SimpleExpSmoothing(goog_train).fit(smoothing_level=0.2)
-    # ses_forecast_1 = ses_1.forecast(test_length)
-    # ses_2 = SimpleExpSmoothing(goog_train).fit(smoothing_level=0.5)
-    # ses_forecast_2 = ses_2.forecast(test_length)
-    # ses_3 = SimpleExpSmoothing(goog_train).fit()
-    # alpha = ses_3.model.params["smoothing_level"]
-    # ses_forecast_3 = ses_3.forecast(test_length)
+    # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
+    ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=0.2
+    )
+    ses_forecast_1 = ses_1.forecast(test_length)
+    ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=0.5
+    )
+    ses_forecast_2 = ses_2.forecast(test_length)
+    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit()
+    alpha = ses_3.model.params["smoothing_level"]
+    ses_forecast_3 = ses_3.forecast(test_length)
 
-    # # 7. Plot the original prices together with the models' results:
-    # goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
-    # ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
-    # ses_1.fittedvalues.plot(color=COLORS[1])
-    # ses_forecast_2.plot(color=COLORS[2], legend=True, label=r"$\alpha=0.5$")
-    # ses_2.fittedvalues.plot(color=COLORS[2])
-    # ses_forecast_3.plot(color=COLORS[3], legend=True, label=r"$\alpha={0:.4f}$".format(alpha))
-    # ses_3.fittedvalues.plot(color=COLORS[3])
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im15.png")
-    # plt.close()
+    # 7. Plot the original prices together with the models' results:
+    goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
+    ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
+    ses_1.fittedvalues.plot(color=COLORS[1])
+    ses_forecast_2.plot(color=COLORS[2], legend=True, label=r"$\alpha=0.5$")
+    ses_2.fittedvalues.plot(color=COLORS[2])
+    ses_forecast_3.plot(color=COLORS[3], legend=True, label=r"$\alpha={0:.4f}$".format(alpha))
+    ses_3.fittedvalues.plot(color=COLORS[3])
+    plt.tight_layout()
+    plt.savefig("images/ch3_im15.png")
+    plt.close()
 
-    # # Holt's model with linear trend
-    # hs_1 = Holt(goog_train).fit()
-    # hs_forecast_1 = hs_1.forecast(test_length)
-    #
-    # # Holt's model with exponential trend
-    # hs_2 = Holt(goog_train, exponential=True).fit()
-    # # equivalent to ExponentialSmoothing(goog_train, trend='mul').fit()
-    # hs_forecast_2 = hs_2.forecast(test_length)
-    #
-    # # Holt's model with exponential trend and damping
-    # hs_3 = Holt(goog_train, exponential=False, damped=True).fit(damping_slope=0.99)
-    # hs_forecast_3 = hs_3.forecast(test_length)
-    #
-    # # 9. Plot the original prices together with the models' results:
-    # goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
-    # hs_1.fittedvalues.plot(color=COLORS[1])
-    # hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
-    # hs_2.fittedvalues.plot(color=COLORS[2])
-    # hs_forecast_2.plot(color=COLORS[2], legend=True, label="Exponential trend")
-    # hs_3.fittedvalues.plot(color=COLORS[3])
-    # hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im16.png")
+    # Holt's model with linear trend
+    hs_1 = Holt(goog_train).fit()
+    hs_forecast_1 = hs_1.forecast(test_length)
+    # Holt's model with exponential trend
+    hs_2 = Holt(goog_train, exponential=True).fit()
+    # equivalent to ExponentialSmoothing(goog_train, trend='mul').fit()
+    hs_forecast_2 = hs_2.forecast(test_length)
+    # Holt's model with exponential trend and damping
+    hs_3 = Holt(goog_train, exponential=False, damped=True).fit(damping_slope=0.99)
+    hs_forecast_3 = hs_3.forecast(test_length)
 
-    # SEASONAL_PERIODS = 12
-    #
-    # # Holt-Winter's model with exponential trend
-    # hw_1 = ExponentialSmoothing(
-    #     goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS
-    # ).fit()
-    # hw_forecast_1 = hw_1.forecast(test_length)
-    #
-    # # Holt-Winter's model with exponential trend and damping
-    # hw_2 = ExponentialSmoothing(
-    #     goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS, damped=True
-    # ).fit()
-    # hw_forecast_2 = hw_2.forecast(test_length)
-    #
-    # goog.plot(
-    #     color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
-    # )
-    #
-    # hw_1.fittedvalues.plot(color=COLORS[1])
-    # hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
-    # phi = hw_2.model.params["damping_slope"]
-    # plot_label = f"Seasonal Smoothing (damped with $\phi={phi:.4f}$)"
-    # hw_2.fittedvalues.plot(color=COLORS[2])
-    # hw_forecast_2.plot(color=COLORS[2], legend=True, label=plot_label)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im17.png")
-    #
-    # ## Modeling time series with ARIMA class models
-    # src_data = "data/yf_google.pkl"
-    # start = datetime(2000, 1, 1)
-    # end = datetime(2020, 12, 31)
-    # try:
-    #     goog = pd.read_pickle(src_data)
-    #     print("data reading from file...")
-    # except FileNotFoundError:
-    #     goog = yf.download("GOOG", start=start, end=end, adjusted=True)
-    #     goog.to_pickle(src_data)
-    #
-    # df = goog.copy()["2015-1":"2018-12"]
-    # goog = df.resample("W").last().rename(columns={"Adj Close": "adj_close"}).adj_close
-    # goog_diff = goog.diff().dropna()
-    #
-    # fig, ax = plt.subplots(2, sharex=True)
-    # goog.plot(title="Google's stock price", ax=ax[0])
-    # goog_diff.plot(ax=ax[1], title="First Differences")
-    #
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im18.png")
-    # plt.close()
-    #
-    # fig = test_autocorrelation(goog_diff)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im19.png")
-    #
-    # arima = ARIMA(goog, order=(2, 1, 1)).fit(disp=0)
-    # arima.summary()
-    #
-    # def arima_diagnostics(resids, n_lags=40):
-    #     """
-    #     Function for diagnosing the fit of an ARIMA model by investigating the residuals.
-    #
-    #     Parameters
-    #     ----------
-    #     resids : np.array
-    #         An array containing the residuals of a fitted model
-    #     n_lags : int
-    #         Number of lags for autocorrelation plot
-    #
-    #     Returns
-    #     -------
-    #     fig : matplotlib.figure.Figure
-    #         Created figure
-    #     """
-    #
-    #     # create placeholder subplots
-    #     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-    #
-    #     r = resids
-    #     resids = (r - np.nanmean(r)) / np.nanstd(r)
-    #     resids_nonmissing = resids[~(np.isnan(resids))]
-    #
-    #     # residuals over time
-    #     sns.lineplot(x=np.arange(len(resids)), y=resids, ax=ax1)
-    #     ax1.set_title("Standardized residuals")
-    #
-    #     # distribution of residuals
-    #     x_lim = (-1.96 * 2, 1.96 * 2)
-    #     r_range = np.linspace(x_lim[0], x_lim[1])
-    #     norm_pdf = scs.norm.pdf(r_range)
-    #
-    #     sns.distplot(resids_nonmissing, hist=True, kde=True, norm_hist=True, ax=ax2)
-    #     ax2.plot(r_range, norm_pdf, "g", lw=2, label="N(0,1)")
-    #     ax2.set_title("Distribution of standardized residuals")
-    #     ax2.set_xlim(x_lim)
-    #     ax2.legend()
-    #
-    #     # Q-Q plot
-    #     qq = sm.qqplot(resids_nonmissing, line="s", ax=ax3)
-    #     ax3.set_title("Q-Q plot")
-    #
-    #     # ACF plot
-    #     plot_acf(resids, ax=ax4, lags=n_lags, alpha=0.05)
-    #     ax4.set_title("ACF plot")
-    #
-    #     return fig
-    #
-    # arima_diagnostics(arima.resid, 40)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im21.png")
-    #
-    # # 8. Apply the Ljung-Box's test for no autocorrelation in the residuals and plot the results:
-    # ljung_box_results = acorr_ljungbox(arima.resid)
-    #
-    # fig, ax = plt.subplots(1, figsize=[16, 5])
-    # sns.scatterplot(x=range(len(ljung_box_results[1])), y=ljung_box_results[1], ax=ax)
-    # ax.axhline(0.05, ls="--", c="r")
-    # ax.set(title="Ljung-Box test's results", xlabel="Lag", ylabel="p-value")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im22.png")
-    #
-    # auto_arima = pm.auto_arima(goog, error_action="ignore", suppress_warnings=True, seasonal=False)
-    # auto_arima.summary()
-    #
-    # auto_arima = pm.auto_arima(
-    #     goog,
-    #     error_action="ignore",
-    #     suppress_warnings=True,
-    #     seasonal=False,
-    #     stepwise=False,
-    #     approximation=False,
-    #     n_jobs=-1,
-    # )
-    # auto_arima.summary()
-    #
-    # ## Forecasting using ARIMA class models
-    # src_data = "data/yf_google.pkl"
-    # start = datetime(2000, 1, 1)
-    # end = datetime(2020, 12, 31)
-    # try:
-    #     goog = pd.read_pickle(src_data)
-    #     print("data reading from file...")
-    # except FileNotFoundError:
-    #     goog = yf.download("GOOG", start=start, end=end, adjusted=True)
-    #     goog.to_pickle(src_data)
-    # df = goog.copy()["2019-1":"2019-3"]
-    # ic(f"Downloaded {df.shape[0]} rows of data.")
-    # test = df.resample("W").last().rename(columns={"Adj Close": "adj_close"}).adj_close
-    #
-    # n_forecasts = len(test)
-    # arima_pred = arima.forecast(n_forecasts)
-    # arima_pred = [
-    #     pd.DataFrame(arima_pred[0], columns=["prediction"]),
-    #     pd.DataFrame(arima_pred[2], columns=["ci_lower", "ci_upper"]),
-    # ]
-    # arima_pred = pd.concat(arima_pred, axis=1).set_index(test.index)
-    # auto_arima_pred = auto_arima.predict(n_periods=n_forecasts, return_conf_int=True, alpha=0.05)
-    # auto_arima_pred = [
-    #     pd.DataFrame(auto_arima_pred[0], columns=["prediction"]),
-    #     pd.DataFrame(auto_arima_pred[1], columns=["ci_lower", "ci_upper"]),
-    # ]
-    # auto_arima_pred = pd.concat(auto_arima_pred, axis=1).set_index(test.index)
-    #
-    # fig, ax = plt.subplots(1)
-    # ax = sns.lineplot(data=test, color=COLORS[0], label="Actual")
-    # ax.plot(arima_pred.prediction, c=COLORS[1], label="ARIMA(2,1,1)")
-    # ax.fill_between(
-    #     arima_pred.index, arima_pred.ci_lower, arima_pred.ci_upper, alpha=0.3, facecolor=COLORS[1]
-    # )
-    # ax.plot(auto_arima_pred.prediction, c=COLORS[2], label="ARIMA(3,1,2)")
-    # ax.fill_between(
-    #     auto_arima_pred.index,
-    #     auto_arima_pred.ci_lower,
-    #     auto_arima_pred.ci_upper,
-    #     alpha=0.2,
-    #     facecolor=COLORS[2],
-    # )
-    # ax.set(title="Google's stock price  - actual vs. predicted", xlabel="Date", ylabel="Price ($)")
-    # ax.legend(loc="upper left")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im25.png")
-    # plt.close()
+    # 9. Plot the original prices together with the models' results:
+    goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
+    hs_1.fittedvalues.plot(color=COLORS[1])
+    hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
+    hs_2.fittedvalues.plot(color=COLORS[2])
+    hs_forecast_2.plot(color=COLORS[2], legend=True, label="Exponential trend")
+    hs_3.fittedvalues.plot(color=COLORS[3])
+    hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im16.png")
+    plt.close()
+
+    SEASONAL_PERIODS = 12
+    # Holt-Winter's model with exponential trend
+    hw_1 = ExponentialSmoothing(
+        goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS
+    ).fit()
+    hw_forecast_1 = hw_1.forecast(test_length)
+    # Holt-Winter's model with exponential trend and damping
+    hw_2 = ExponentialSmoothing(
+        goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS, damped=True
+    ).fit()
+    hw_forecast_2 = hw_2.forecast(test_length)
+
+    goog.plot(
+        color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
+    )
+    hw_1.fittedvalues.plot(color=COLORS[1])
+    hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
+    phi = hw_2.model.params["damping_slope"]
+    plot_label = f"Seasonal Smoothing (damped with $\phi={phi:.4f}$)"
+    hw_2.fittedvalues.plot(color=COLORS[2])
+    hw_forecast_2.plot(color=COLORS[2], legend=True, label=plot_label)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im17.png")
+    plt.close()
+
+    ## Modeling time series with ARIMA class models
+    src_data = "data/yf_google.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        goog = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        goog = yf.download("GOOG", start=start, end=end, adjusted=True)
+        goog.to_pickle(src_data)
+    df = goog.copy()["2015-1":"2018-12"]
+    goog = df.resample("W").last().rename(columns={"Adj Close": "adj_close"}).adj_close
+    goog_diff = goog.diff().dropna()
+
+    fig, ax = plt.subplots(2, sharex=True)
+    goog.plot(title="Google's stock price", ax=ax[0])
+    goog_diff.plot(ax=ax[1], title="First Differences")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im18.png")
+    fig = test_autocorrelation(goog_diff)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im19.png")
+    plt.close()
+
+    arima = ARIMA(goog, order=(2, 1, 1)).fit(disp=0)
+    arima.summary()
+
+    def arima_diagnostics(resids, n_lags=40):
+        """
+        Function for diagnosing the fit of an ARIMA model by investigating the residuals.
+        Parameters
+        ----------
+        resids : np.array
+            An array containing the residuals of a fitted model
+        n_lags : int
+            Number of lags for autocorrelation plot
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Created figure
+        """
+        # create placeholder subplots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+        r = resids
+        resids = (r - np.nanmean(r)) / np.nanstd(r)
+        resids_nonmissing = resids[~(np.isnan(resids))]
+        # residuals over time
+        sns.lineplot(x=np.arange(len(resids)), y=resids, ax=ax1)
+        ax1.set_title("Standardized residuals")
+        # distribution of residuals
+        x_lim = (-1.96 * 2, 1.96 * 2)
+        r_range = np.linspace(x_lim[0], x_lim[1])
+        norm_pdf = scs.norm.pdf(r_range)
+
+        sns.distplot(resids_nonmissing, hist=True, kde=True, norm_hist=True, ax=ax2)
+        ax2.plot(r_range, norm_pdf, "g", lw=2, label="N(0,1)")
+        ax2.set_title("Distribution of standardized residuals")
+        ax2.set_xlim(x_lim)
+        ax2.legend()
+        sm.qqplot(resids_nonmissing, line="s", ax=ax3)
+        ax3.set_title("Q-Q plot")
+        plot_acf(resids, ax=ax4, lags=n_lags, alpha=0.05)
+        ax4.set_title("ACF plot")
+        return fig
+
+    arima_diagnostics(arima.resid, 40)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im21.png")
+
+    # 8. Apply the Ljung-Box's test for no autocorrelation in the residuals and plot the results:
+    ljung_box_results = acorr_ljungbox(arima.resid)
+
+    fig, ax = plt.subplots(1, figsize=[16, 5])
+    sns.scatterplot(x=range(len(ljung_box_results[1])), y=ljung_box_results[1], ax=ax)
+    ax.axhline(0.05, ls="--", c="r")
+    ax.set(title="Ljung-Box test's results", xlabel="Lag", ylabel="p-value")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im22.png")
+
+    auto_arima = pm.auto_arima(goog, error_action="ignore", suppress_warnings=True, seasonal=False)
+    auto_arima.summary()
+
+    auto_arima = pm.auto_arima(
+        goog,
+        error_action="ignore",
+        suppress_warnings=True,
+        seasonal=False,
+        stepwise=False,
+        approximation=False,
+        n_jobs=-1,
+    )
+    auto_arima.summary()
+
+    ## Forecasting using ARIMA class models
+    src_data = "data/yf_google.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        goog = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        goog = yf.download("GOOG", start=start, end=end, adjusted=True)
+        goog.to_pickle(src_data)
+    df = goog.copy()["2019-1":"2019-3"]
+    ic(f"Downloaded {df.shape[0]} rows of data.")
+    test = df.resample("W").last().rename(columns={"Adj Close": "adj_close"}).adj_close
+
+    n_forecasts = len(test)
+    arima_pred = arima.forecast(n_forecasts)
+    arima_pred = [
+        pd.DataFrame(arima_pred[0], columns=["prediction"]),
+        pd.DataFrame(arima_pred[2], columns=["ci_lower", "ci_upper"]),
+    ]
+    arima_pred = pd.concat(arima_pred, axis=1).set_index(test.index)
+    auto_arima_pred = auto_arima.predict(n_periods=n_forecasts, return_conf_int=True, alpha=0.05)
+    auto_arima_pred = [
+        pd.DataFrame(auto_arima_pred[0], columns=["prediction"]),
+        pd.DataFrame(auto_arima_pred[1], columns=["ci_lower", "ci_upper"]),
+    ]
+    auto_arima_pred = pd.concat(auto_arima_pred, axis=1).set_index(test.index)
+
+    fig, ax = plt.subplots(1)
+    ax = sns.lineplot(data=test, color=COLORS[0], label="Actual")
+    ax.plot(arima_pred.prediction, c=COLORS[1], label="ARIMA(2,1,1)")
+    ax.fill_between(
+        arima_pred.index, arima_pred.ci_lower, arima_pred.ci_upper, alpha=0.3, facecolor=COLORS[1]
+    )
+    ax.plot(auto_arima_pred.prediction, c=COLORS[2], label="ARIMA(3,1,2)")
+    ax.fill_between(
+        auto_arima_pred.index,
+        auto_arima_pred.ci_lower,
+        auto_arima_pred.ci_upper,
+        alpha=0.2,
+        facecolor=COLORS[2],
+    )
+    ax.set(title="Google's stock price  - actual vs. predicted", xlabel="Date", ylabel="Price ($)")
+    ax.legend(loc="upper left")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im25.png")
+    plt.close()
