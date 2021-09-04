@@ -431,164 +431,70 @@ if __name__ == "__main__":
     delta = (P_plus_h - P_minus_h) / (2 * h)
     print(f"Delta of the option: {delta:.2f}")
 
-    # # ## Estimating Value-at-risk using Monte Carlo
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import libraries:
-    #
-    # # In[42]:
-    #
-    #
-    # import numpy as np
-    # import pandas as pd
-    # import yfinance as yf
-    # import seaborn as sns
-    #
-    #
-    # # In[43]:
-    #
-    #
-    # # set random seed for reproducibility
-    # np.random.seed(42)
-    #
-    #
-    # # 2. Define the parameters that will be used for this exercise:
-    #
-    # # In[44]:
-    #
-    #
-    # RISKY_ASSETS = ['GOOG', 'FB']
-    # SHARES = [5, 5]
-    # START_DATE = '2018-01-01'
-    # END_DATE = '2018-12-31'
-    # T = 1
-    # N_SIMS = 10 ** 5
-    #
-    #
-    # # 3. Download data from Yahoo Finance:
-    #
-    # # In[45]:
-    #
-    #
-    # df = yf.download(RISKY_ASSETS, start=START_DATE,
-    #                  end=END_DATE, adjusted=True)
-    # print(f'Downloaded {df.shape[0]} rows of data.')
-    #
-    #
-    # # In[46]:
-    #
-    #
-    # df.head()
-    #
-    #
-    # # 4. Calculate daily returns:
-    #
-    # # In[47]:
-    #
-    #
-    # adj_close = df['Adj Close']
-    # returns = adj_close.pct_change().dropna()
-    # plot_title = f'{" vs. ".join(RISKY_ASSETS)} returns: {START_DATE} - {END_DATE}'
-    # returns.plot(title=plot_title)
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch6_im3.png')
-    # plt.show()
-    #
-    # print(f'Correlation between returns: {returns.corr().values[0,1]:.2f}')
-    #
-    #
-    # # 5. Calculate the covariance matrix:
-    #
-    # # In[48]:
-    #
-    #
-    # cov_mat = returns.cov()
-    # cov_mat
-    #
-    #
-    # # 6. Perform the Cholesky decomposition of the covariance matrix:
-    #
-    # # In[49]:
-    #
-    #
-    # chol_mat = np.linalg.cholesky(cov_mat)
-    # chol_mat
-    #
-    #
-    # # 7. Draw correlated random numbers from Standard Normal distribution:
-    #
-    # # In[50]:
-    #
-    #
-    # rv = np.random.normal(size=(N_SIMS, len(RISKY_ASSETS)))
-    # correlated_rv = np.transpose(np.matmul(chol_mat, np.transpose(rv)))
-    #
-    #
-    # # 8. Define metrics used for simulations:
-    #
-    # # In[51]:
-    #
-    #
-    # r = np.mean(returns, axis=0).values
-    # sigma = np.std(returns, axis=0).values
-    # S_0 = adj_close.values[-1, :]
-    # P_0 = np.sum(SHARES * S_0)
-    #
-    #
-    # # 9. Calculate the terminal price of the considered stocks:
-    #
-    # # In[52]:
-    #
-    #
-    # S_T = S_0 * np.exp((r - 0.5 * sigma ** 2) * T +
-    #                    sigma * np.sqrt(T) * correlated_rv)
-    #
-    #
-    # # 10. Calculate the terminal portfolio value and calculate the portfolio returns:
-    #
-    # # In[53]:
-    #
-    #
-    # P_T = np.sum(SHARES * S_T, axis=1)
-    # P_diff = P_T - P_0
-    #
-    #
-    # # 11. Calculate VaR:
-    #
-    # # In[54]:
-    #
-    #
-    # P_diff_sorted = np.sort(P_diff)
-    # percentiles = [0.01, 0.1, 1.]
-    # var = np.percentile(P_diff_sorted, percentiles)
-    #
-    # for x, y in zip(percentiles, var):
-    #     print(f'1-day VaR with {100-x}% confidence: {-y:.2f}$')
-    #
-    #
-    # # 12. Present the results on a graph:
-    #
-    # # In[55]:
-    #
-    #
-    # ax = sns.distplot(P_diff, kde=False)
-    # ax.set_title('''Distribution of possible 1-day changes in portfolio value
-    #              1-day 99% VaR''', fontsize=16)
-    # ax.axvline(var[2], 0, 10000)
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch6_im4.png')
-    # plt.show()
-    #
-    #
-    # # ### There's more
-    #
-    # # In[56]:
-    #
-    #
-    # var = np.percentile(P_diff_sorted, 5)
-    # expected_shortfall = P_diff_sorted[P_diff_sorted<=var].mean()
-    #
-    # print(f'The 1-day 95% VaR is {-var:.2f}$, and the accompanying Expected Shortfall is {-expected_shortfall:.2f}$.')
+    ## Estimating Value-at-risk using Monte Carlo
+    np.random.seed(42)
+    risky_assets = ["GOOG", "FB"]
+    SHARES = [5, 5]
+    T = 1
+    N_SIMS = 10 ** 5
+
+    src_data = "data/yf_assets_c06_1.pkl"
+    try:
+        data = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        data = yf.download(risky_assets, start=start, end=end, adjusted=True, progress=False)
+        data.to_pickle(src_data)
+    df = data["2018-1":"2018-12"]
+    print(f"Downloaded {df.shape[0]} rows of data.")
+    ic(df.head())
+
+    adj_close = df["Adj Close"]
+    returns = adj_close.pct_change().dropna()
+    plot_title = f'{" vs. ".join(risky_assets)} returns: 2018-01 - 2018-12'
+    returns.plot(title=plot_title)
+    plt.tight_layout()
+    plt.savefig("images/ch6_im3.png")
+    print(f"Correlation between returns: {returns.corr().values[0,1]:.2f}")
+
+    cov_mat = returns.cov()
+    ic(cov_mat)
+
+    # 6. Perform the Cholesky decomposition of the covariance matrix:
+    chol_mat = np.linalg.cholesky(cov_mat)
+    ic(chol_mat)
+    # 7. Draw correlated random numbers from Standard Normal distribution:
+    rv = np.random.normal(size=(N_SIMS, len(risky_assets)))
+    correlated_rv = np.transpose(np.matmul(chol_mat, np.transpose(rv)))
+
+    r = np.mean(returns, axis=0).values
+    sigma = np.std(returns, axis=0).values
+    S_0 = adj_close.values[-1, :]
+    P_0 = np.sum(SHARES * S_0)
+    # 9. Calculate the terminal price of the considered stocks:
+    S_T = S_0 * np.exp((r - 0.5 * sigma ** 2) * T + sigma * np.sqrt(T) * correlated_rv)
+    # 10. Calculate the terminal portfolio value and calculate the portfolio returns:
+    P_T = np.sum(SHARES * S_T, axis=1)
+    P_diff = P_T - P_0
+    # 11. Calculate VaR:
+    P_diff_sorted = np.sort(P_diff)
+    percentiles = [0.01, 0.1, 1.0]
+    var = np.percentile(P_diff_sorted, percentiles)
+    for x, y in zip(percentiles, var):
+        print(f"1-day VaR with {100-x}% confidence: {-y:.2f}$")
+
+    ax = sns.distplot(P_diff, kde=False)
+    ax.set_title(
+        """Distribution of possible 1-day changes in portfolio value
+                 1-day 99% VaR""",
+        fontsize=16,
+    )
+    ax.axvline(var[2], 0, 10000)
+    plt.tight_layout()
+    plt.savefig("images/ch6_im4.png")
+
+    var = np.percentile(P_diff_sorted, 5)
+    expected_shortfall = P_diff_sorted[P_diff_sorted <= var].mean()
+    print(
+        f"The 1-day 95% VaR is {-var:.2f}$, and the accompanying Expected Shortfall is {-expected_shortfall:.2f}$."
+    )
