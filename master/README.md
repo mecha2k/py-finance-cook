@@ -7,7 +7,7 @@ Paperback: 432 pages
 Publisher: Packt Publishing  
 Language: English
 
-[<img src="./.img/book_cover.png" width="248">]()
+[<img src="D:\Code\python\master\py-finance-cook\master\.img\book_cover.png" width="248"/>]()
 
 ## Links
 
