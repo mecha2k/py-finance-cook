@@ -18,6 +18,7 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader, Subset
 from collections import OrderedDict
 from sklearn import metrics
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import StratifiedKFold
@@ -183,12 +184,12 @@ if __name__ == "__main__":
     # learn.lr_find()
     # learn.recorder.plot(suggestion=True)
     # plt.tight_layout()
-    # plt.savefig("images/ch10_im2.png")
+    # plt.savefig("images/ch10_im1.png")
     #
     # learn.fit(epochs=25, lr=1e-6, wd=0.2)
     # learn.recorder.plot_losses()
     # plt.tight_layout()
-    # plt.savefig("images/ch10_im4.png")
+    # plt.savefig("images/ch10_im2.png")
     #
     # preds_valid, _ = learn.get_preds(ds_type=DatasetType.Valid)
     # pred_valid = preds_valid.argmax(dim=-1)
@@ -197,7 +198,7 @@ if __name__ == "__main__":
     # interp = ClassificationInterpretation.from_learner(learn)
     # interp.plot_confusion_matrix()
     # plt.tight_layout()
-    # plt.savefig("images/ch10_im5.png")
+    # plt.savefig("images/ch10_im3.png")
     # interp.plot_tab_top_losses(5)
     # performance_evaluation_report(learn)
     #
@@ -235,7 +236,7 @@ if __name__ == "__main__":
     ax.plot(df.index, prices)
     ax.set(title=f"{TICKER}'s Stock price", xlabel="Time", ylabel="Price ($)")
     plt.tight_layout()
-    plt.savefig("images/ch10_im6.png")
+    plt.savefig("images/ch10_im4.png")
 
     def create_input_data(series, n_lags=1):
         """
@@ -316,7 +317,7 @@ if __name__ == "__main__":
     ax.set(title="Linear Regression's Forecasts", xlabel="Time", ylabel="Price ($)")
     ax.legend()
     plt.tight_layout()
-    plt.savefig("images/ch10_im6_1.png")
+    plt.savefig("images/ch10_im4_1.png")
 
     class MLP(nn.Module):
         def __init__(self, input_size):
@@ -367,15 +368,11 @@ if __name__ == "__main__":
                 y_hat = model(x_val)
                 loss = loss_fn(y_val, y_hat)
                 running_loss_valid += loss.item() * x_val.size(0)
-
             epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
-
             if epoch > 0 and epoch_loss_valid < min(valid_losses):
                 best_epoch = epoch
                 torch.save(model.state_dict(), "data/mlp_checkpoint.pth")
-
             valid_losses.append(epoch_loss_valid)
-
         if epoch % PRINT_EVERY == 0:
             print(
                 f"<{epoch}> - Train. loss: {epoch_loss_train:.2f} \t Valid. loss: {epoch_loss_valid:.2f}"
@@ -391,7 +388,7 @@ if __name__ == "__main__":
     ax.set(title="Loss over epochs", xlabel="Epoch", ylabel="Loss")
     ax.legend()
     plt.tight_layout()
-    plt.savefig("images/ch10_im7.png")
+    plt.savefig("images/ch10_im5.png")
 
     # 12. Load the best model (with the lowest validation loss):
     state_dict = torch.load("data/mlp_checkpoint.pth")
@@ -418,7 +415,7 @@ if __name__ == "__main__":
     ax.set(title="Multilayer Perceptron's Forecasts", xlabel="Time", ylabel="Price ($)")
     ax.legend()
     plt.tight_layout()
-    plt.savefig("images/ch10_im8.png")
+    plt.savefig("images/ch10_im6.png")
 
     #### A sequential approach to defining the network's architecture
     # Below we define the same network as we have already used before in this recipe:
@@ -434,319 +431,187 @@ if __name__ == "__main__":
     ic(model)
 
     #### Estimating neural networks using `scikit-learn`
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[25]:
-    #
-    #
-    # from sklearn.neural_network import MLPRegressor
-    #
-    #
-    # # 2. Define the MLP using scikit-learn:
-    #
-    # # In[26]:
-    #
-    #
-    # mlp = MLPRegressor(hidden_layer_sizes=(8, 4,),
-    #                    learning_rate='constant',
-    #                    batch_size=5,
-    #                    max_iter=1000,
-    #                    random_state=42)
-    #
-    #
-    # # 3. Split the data into training and test set:
-    #
-    # # In[27]:
-    #
-    #
-    # valid_ind = len(X) - VALID_SIZE
-    #
-    # X_train = X[:valid_ind, ]
-    # y_train = y[:valid_ind]
-    #
-    # X_valid = X[valid_ind:, ]
-    # y_valid = y[valid_ind:]
-    #
-    #
-    # # 4. Train the MLP:
-    #
-    # # In[28]:
-    #
-    #
-    # mlp.fit(X_train, y_train)
-    #
-    #
-    # # 5. Plot the loss function over epochs:
-    #
-    # # In[29]:
-    #
-    #
-    # plt.plot(mlp.loss_curve_)
-    #
-    #
-    # # 6. Obtain the predictions:
-    #
-    # # In[30]:
-    #
-    #
-    # y_pred = mlp.predict(X_valid)
-    #
-    #
-    # # 7. Evaluate the predictions and plot them versus the observed values:
-    #
-    # # In[31]:
-    #
-    #
-    # sk_mlp_mse = mean_squared_error(y_valid, y_pred)
-    # sk_mlp_rmse = np.sqrt(sk_mlp_mse)
-    # print(f"Scikit-Learn MLP's forecast - MSE: {sk_mlp_mse:.2f}, RMSE: {sk_mlp_rmse:.2f}")
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(y_valid, color='blue', label='Actual')
-    # ax.plot(y_pred, color='red', label='Prediction')
-    #
-    # ax.set(title="sklearn MLP's Forecasts",
-    #        xlabel='Time',
-    #        ylabel='Price ($)')
-    # ax.legend();
-    #
-    #
-    # # #### Multi-period forecast
-    #
-    # # 1. Define a modified function for creating a dataset for the MLP:
-    #
-    # # In[32]:
-    #
-    #
-    # def create_input_data(series, n_lags=1, n_leads=1):
-    #     '''
-    #     Function for transforming time series into input acceptable by a multilayer perceptron.
-    #
-    #     Parameters
-    #     ----------
-    #     series : np.array
-    #         The time series to be transformed
-    #     n_lags : int
-    #         The number of lagged observations to consider as features
-    #     n_leads : int
-    #         The number of future periods we want to forecast for
-    #
-    #     Returns
-    #     -------
-    #     X : np.array
-    #         Array of features
-    #     y : np.array
-    #         Array of target
-    #     '''
-    #     X, y = [], []
-    #
-    #     for step in range(len(series) - n_lags - n_leads + 1):
-    #         end_step = step + n_lags
-    #         forward_end = end_step + n_leads
-    #         X.append(series[step:end_step])
-    #         y.append(series[end_step:forward_end])
-    #     return np.array(X), np.array(y)
-    #
-    #
-    # # 2. Create features and target from the time series of prices:
-    #
-    # # In[33]:
-    #
-    #
-    # # parameters for the dataset
-    # N_LAGS = 3
-    # N_FUTURE = 2
-    #
-    # X, y = create_input_data(prices, N_LAGS, N_FUTURE)
-    #
-    # X_tensor = torch.from_numpy(X).float()
-    # y_tensor = torch.from_numpy(y).float()
-    #
-    #
-    # # 3. Create training and validation sets:
-    #
-    # # In[34]:
-    #
-    #
-    # dataset = TensorDataset(X_tensor, y_tensor)
-    #
-    # valid_ind = len(X) - VALID_SIZE + (N_FUTURE - 1)
-    #
-    # train_dataset = Subset(dataset, list(range(valid_ind)))
-    # valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
-    #
-    # train_loader = DataLoader(dataset=train_dataset,
-    #                           batch_size=BATCH_SIZE)
-    # valid_loader = DataLoader(dataset=valid_dataset,
-    #                           batch_size=BATCH_SIZE)
-    #
-    #
-    # # 4. Define the MLP for multi-period forecasting:
-    #
-    # # In[35]:
-    #
-    #
-    # class MLP(nn.Module):
-    #
-    #     def __init__(self, input_size, output_size):
-    #         super(MLP, self).__init__()
-    #         self.linear1 = nn.Linear(input_size, 16)
-    #         self.linear2 = nn.Linear(16, 8)
-    #         self.linear3 = nn.Linear(8, output_size)
-    #         self.dropout = nn.Dropout(p=0.2)
-    #
-    #     def forward(self, x):
-    #         x = self.linear1(x)
-    #         x = F.relu(x)
-    #         x = self.dropout(x)
-    #         x = self.linear2(x)
-    #         x = F.relu(x)
-    #         x = self.dropout(x)
-    #         x = self.linear3(x)
-    #         return x
-    #
-    #
-    # # 5. Instantiate the model, the loss function and the optimizer:
-    #
-    # # In[36]:
-    #
-    #
-    # # set seed for reproducibility
-    # torch.manual_seed(42)
-    #
-    # model = MLP(N_LAGS, N_FUTURE).to(device)
-    # loss_fn = nn.MSELoss()
-    # optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #
-    #
-    # # 6. Train the network:
-    #
-    # # In[37]:
-    #
-    #
-    # PRINT_EVERY = 50
-    # train_losses, valid_losses = [], []
-    #
-    # for epoch in range(N_EPOCHS):
-    #     running_loss_train = 0
-    #     running_loss_valid = 0
-    #
-    #     model.train()
-    #
-    #     for x_batch, y_batch in train_loader:
-    #
-    #         optimizer.zero_grad()
-    #
-    #         x_batch = x_batch.to(device)
-    #         y_batch = y_batch.to(device)
-    #         y_hat = model(x_batch)
-    #         loss = loss_fn(y_batch, y_hat)
-    #         loss.backward()
-    #         optimizer.step()
-    #         running_loss_train += loss.item() * x_batch.size(0)
-    #
-    #     epoch_loss_train = running_loss_train / len(train_loader.dataset)
-    #     train_losses.append(epoch_loss_train)
-    #
-    #     with torch.no_grad():
-    #
-    #         model.eval()
-    #
-    #         for x_val, y_val in valid_loader:
-    #             x_val = x_val.to(device)
-    #             y_val = y_val.to(device)
-    #             y_hat = model(x_val)
-    #             loss = loss_fn(y_val, y_hat)
-    #             running_loss_valid += loss.item() * x_val.size(0)
-    #
-    #         epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
-    #
-    #         if epoch > 0 and epoch_loss_valid < min(valid_losses):
-    #             best_epoch = epoch
-    #             torch.save(model.state_dict(), './mlp_checkpoint_2.pth')
-    #
-    #         valid_losses.append(epoch_loss_valid)
-    #
-    #     if epoch % PRINT_EVERY == 0:
-    #         print(f"<{epoch}> - Train. loss: {epoch_loss_train:.2f} \t Valid. loss: {epoch_loss_valid:.2f}")
-    #
-    # print(f'Lowest loss recorded in epoch: {best_epoch}')
-    #
-    #
-    # # 7. Plot the training and validation losses:
-    #
-    # # In[39]:
-    #
-    #
-    # train_losses = np.array(train_losses)
-    # valid_losses = np.array(valid_losses)
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(train_losses, color='blue', label='Training loss')
-    # ax.plot(valid_losses, color='red', label='Validation loss')
-    #
-    # ax.set(title="Loss over epochs",
-    #        xlabel='Epoch',
-    #        ylabel='Loss')
-    # ax.legend();
-    #
-    #
-    # # 8. Load the best model (with the lowest validation loss):
-    #
-    # # In[40]:
-    #
-    #
-    # state_dict = torch.load('mlp_checkpoint_2.pth')
-    # model.load_state_dict(state_dict)
-    #
-    #
-    # # 9. Obtain predictions:
-    #
-    # # In[41]:
-    #
-    #
-    # y_pred = []
-    #
-    # with torch.no_grad():
-    #
-    #     model.eval()
-    #
-    #     for x_val, y_val in valid_loader:
-    #         x_val = x_val.to(device)
-    #         yhat = model(x_val)
-    #         y_pred.append(yhat)
-    #
-    # y_pred = torch.cat(y_pred).numpy()
-    #
-    #
-    # # 10. Plot the predictions:
-    #
-    # # In[42]:
-    #
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(y_valid, color='blue', label='Actual')
-    #
-    # for i in range(len(y_pred)):
-    #     if i == 0:
-    #         ax.plot(np.array([i, i + 1]), y_pred[i], color='red', label='Prediction')
-    #     else:
-    #         ax.plot(np.array([i, i + 1]), y_pred[i], color='red')
-    #
-    # ax.set(title="MLP's Multi-period Forecasts",
-    #        xlabel='Time',
-    #        ylabel='Price ($)')
-    # ax.legend()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im9.png')
-    # plt.show()
-    #
-    #
+    mlp = MLPRegressor(
+        hidden_layer_sizes=(
+            8,
+            4,
+        ),
+        learning_rate="constant",
+        batch_size=5,
+        max_iter=1000,
+        random_state=42,
+    )
+
+    valid_ind = len(X) - VALID_SIZE
+    X_train = X[
+        :valid_ind,
+    ]
+    y_train = y[:valid_ind]
+    X_valid = X[
+        valid_ind:,
+    ]
+    y_valid = y[valid_ind:]
+
+    mlp.fit(X_train, y_train)
+    plt.plot(mlp.loss_curve_)
+    plt.tight_layout()
+    plt.savefig("images/ch10_im7.png")
+
+    y_pred = mlp.predict(X_valid)
+    sk_mlp_mse = mean_squared_error(y_valid, y_pred)
+    sk_mlp_rmse = np.sqrt(sk_mlp_mse)
+    print(f"Scikit-Learn MLP's forecast - MSE: {sk_mlp_mse:.2f}, RMSE: {sk_mlp_rmse:.2f}")
+
+    fig, ax = plt.subplots()
+    ax.plot(y_valid, color="blue", label="Actual")
+    ax.plot(y_pred, color="red", label="Prediction")
+    ax.set(title="sklearn MLP's Forecasts", xlabel="Time", ylabel="Price ($)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im8.png")
+
+    #### Multi-period forecast
+
+    def create_input_data(series, n_lags=1, n_leads=1):
+        """
+        Function for transforming time series into input acceptable by a multilayer perceptron.
+        Parameters
+        ----------
+        series : np.array
+            The time series to be transformed
+        n_lags : int
+            The number of lagged observations to consider as features
+        n_leads : int
+            The number of future periods we want to forecast for
+        Returns
+        -------
+        X : np.array
+            Array of features
+        y : np.array
+            Array of target
+        """
+        X, y = [], []
+        for step in range(len(series) - n_lags - n_leads + 1):
+            end_step = step + n_lags
+            forward_end = end_step + n_leads
+            X.append(series[step:end_step])
+            y.append(series[end_step:forward_end])
+        return np.array(X), np.array(y)
+
+    # 2. Create features and target from the time series of prices:
+    # parameters for the dataset
+    N_LAGS = 3
+    N_FUTURE = 2
+
+    X, y = create_input_data(prices, N_LAGS, N_FUTURE)
+    X_tensor = torch.from_numpy(X).float()
+    y_tensor = torch.from_numpy(y).float()
+
+    dataset = TensorDataset(X_tensor, y_tensor)
+    valid_ind = len(X) - VALID_SIZE + (N_FUTURE - 1)
+
+    train_dataset = Subset(dataset, list(range(valid_ind)))
+    valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE)
+    valid_loader = DataLoader(dataset=valid_dataset, batch_size=BATCH_SIZE)
+
+    # 4. Define the MLP for multi-period forecasting:
+
+    class MLP(nn.Module):
+        def __init__(self, input_size, output_size):
+            super(MLP, self).__init__()
+            self.linear1 = nn.Linear(input_size, 16)
+            self.linear2 = nn.Linear(16, 8)
+            self.linear3 = nn.Linear(8, output_size)
+            self.dropout = nn.Dropout(p=0.2)
+
+        def forward(self, x):
+            x = self.linear1(x)
+            x = F.relu(x)
+            x = self.dropout(x)
+            x = self.linear2(x)
+            x = F.relu(x)
+            x = self.dropout(x)
+            x = self.linear3(x)
+            return x
+
+    torch.manual_seed(42)
+    model = MLP(N_LAGS, N_FUTURE).to(device)
+    loss_fn = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    PRINT_EVERY = 50
+    train_losses, valid_losses = [], []
+
+    for epoch in range(N_EPOCHS):
+        running_loss_train = 0
+        running_loss_valid = 0
+        model.train()
+        for x_batch, y_batch in train_loader:
+            optimizer.zero_grad()
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            y_hat = model(x_batch)
+            loss = loss_fn(y_batch, y_hat)
+            loss.backward()
+            optimizer.step()
+            running_loss_train += loss.item() * x_batch.size(0)
+        epoch_loss_train = running_loss_train / len(train_loader.dataset)
+        train_losses.append(epoch_loss_train)
+        with torch.no_grad():
+            model.eval()
+            for x_val, y_val in valid_loader:
+                x_val = x_val.to(device)
+                y_val = y_val.to(device)
+                y_hat = model(x_val)
+                loss = loss_fn(y_val, y_hat)
+                running_loss_valid += loss.item() * x_val.size(0)
+            epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
+            if epoch > 0 and epoch_loss_valid < min(valid_losses):
+                best_epoch = epoch
+                torch.save(model.state_dict(), "data/mlp_checkpoint_2.pth")
+            valid_losses.append(epoch_loss_valid)
+        if epoch % PRINT_EVERY == 0:
+            print(
+                f"<{epoch}> - Train. loss: {epoch_loss_train:.2f} \t Valid. loss: {epoch_loss_valid:.2f}"
+            )
+    print(f"Lowest loss recorded in epoch: {best_epoch}")
+
+    train_losses = np.array(train_losses)
+    valid_losses = np.array(valid_losses)
+
+    fig, ax = plt.subplots()
+    ax.plot(train_losses, color="blue", label="Training loss")
+    ax.plot(valid_losses, color="red", label="Validation loss")
+    ax.set(title="Loss over epochs", xlabel="Epoch", ylabel="Loss")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im9.png")
+
+    state_dict = torch.load("data/mlp_checkpoint_2.pth")
+    model.load_state_dict(state_dict)
+    y_pred = []
+    with torch.no_grad():
+        model.eval()
+        for x_val, y_val in valid_loader:
+            x_val = x_val.to(device)
+            yhat = model(x_val)
+            y_pred.append(yhat)
+    y_pred = torch.cat(y_pred).cpu().numpy()
+
+    fig, ax = plt.subplots()
+    ax.plot(y_valid, color="blue", label="Actual")
+    for i in range(len(y_pred)):
+        if i == 0:
+            ax.plot(np.array([i, i + 1]), y_pred[i], color="red", label="Prediction")
+        else:
+            ax.plot(np.array([i, i + 1]), y_pred[i], color="red")
+    ax.set(title="MLP's Multi-period Forecasts", xlabel="Time", ylabel="Price ($)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im10.png")
+    plt.close()
 
     ## Convolutional neural networks for time series forecasting
     print(torch.__version__)
