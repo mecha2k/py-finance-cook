@@ -1013,298 +1013,8 @@ if __name__ == "__main__":
     # plt.show()
     #
     #
-    # # ## Convolutional neural networks for time series forecasting
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[5]:
-    #
-    #
-    # import yfinance as yf
-    # import numpy as np
-    # import os
-    # import random
-    #
-    # import torch
-    # import torch.optim as optim
-    # import torch.nn as nn
-    # from torch.utils.data import Dataset, TensorDataset, DataLoader, Subset
-    # from collections import OrderedDict
-    # from chapter_10_utils import create_input_data, custom_set_seed
-    #
-    # from sklearn.metrics import mean_squared_error
-    #
-    # print(torch.__version__)
-    #
-    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #
-    #
-    # # 2. Define the parameters:
-    #
-    # # In[6]:
-    #
-    #
-    # # data
-    # TICKER = 'INTL'
-    # START_DATE = '2015-01-02'
-    # END_DATE = '2019-12-31'
-    # VALID_START = '2019-07-01'
-    # N_LAGS = 12
-    #
-    # # neural network
-    # BATCH_SIZE = 5
-    # N_EPOCHS = 2000
-    #
-    #
-    # # 3. Download and prepare the data:
-    #
-    # # In[7]:
-    #
-    #
-    # df = yf.download(TICKER,
-    #                  start=START_DATE,
-    #                  end=END_DATE,
-    #                  progress=False)
-    #
-    # df = df.resample('W-MON').last()
-    # valid_size = df.loc[VALID_START:END_DATE].shape[0]
-    # prices = df['Adj Close'].values
-    #
-    #
-    # # In[6]:
-    #
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(df.index, prices)
-    # ax.set(title=f"{TICKER}'s Stock price",
-    #        xlabel='Time',
-    #        ylabel='Price ($)');
-    #
-    #
-    # # 4. Transform the time series into input for the CNN:
-    #
-    # # In[7]:
-    #
-    #
-    # X, y = create_input_data(prices, N_LAGS)
-    #
-    #
-    # # 5. Obtain the naïve forecast:
-    #
-    # # In[8]:
-    #
-    #
-    # naive_pred = prices[len(prices) - valid_size - 1:-1]
-    # y_valid = prices[len(prices) - valid_size:]
-    #
-    # naive_mse = mean_squared_error(y_valid, naive_pred)
-    # naive_rmse = np.sqrt(naive_mse)
-    # print(f"Naive forecast - MSE: {naive_mse:.2f}, RMSE: {naive_rmse:.2f}")
-    #
-    #
-    # # 6. Prepare the `DataLoader` objects:
-    #
-    # # In[9]:
-    #
-    #
-    # # set seed for reproducibility
-    # custom_set_seed(42)
-    #
-    # valid_ind = len(X) - valid_size
-    #
-    # X_tensor = torch.from_numpy(X).float()
-    # y_tensor = torch.from_numpy(y).float().unsqueeze(dim=1)
-    #
-    # dataset = TensorDataset(X_tensor, y_tensor)
-    #
-    # train_dataset = Subset(dataset, list(range(valid_ind)))
-    # valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
-    #
-    # train_loader = DataLoader(dataset=train_dataset,
-    #                           batch_size=BATCH_SIZE)
-    # valid_loader = DataLoader(dataset=valid_dataset,
-    #                           batch_size=BATCH_SIZE)
-    #
-    #
-    # # Check the size of the datasets:
-    #
-    # # In[10]:
-    #
-    #
-    # print(f'Size of datasets - training: {len(train_loader.dataset)} | validation: {len(valid_loader.dataset)}')
-    #
-    #
-    # # 7. Define the CNN's architecture:
-    #
-    # # In[11]:
-    #
-    #
-    # class Flatten(nn.Module):
-    #     def forward(self, x):
-    #         return x.view(x.size()[0], -1)
-    #
-    # model = nn.Sequential(OrderedDict([
-    #     ('conv_1', nn.Conv1d(1, 32, 3, padding=1)),
-    #     ('max_pool_1', nn.MaxPool1d(2)),
-    #     ('relu_1', nn.ReLU()),
-    #     ('flatten', Flatten()),
-    #     ('fc_1', nn.Linear(192, 50)),
-    #     ('relu_2', nn.ReLU()),
-    #     ('dropout_1', nn.Dropout(0.4)),
-    #     ('fc_2', nn.Linear(50, 1))
-    # ]))
-    #
-    # print(model)
-    #
-    #
-    # # 8. Instantiate the model, the loss function and the optimizer:
-    #
-    # # In[12]:
-    #
-    #
-    # model = model.to(device)
-    # loss_fn = nn.MSELoss()
-    # optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #
-    #
-    # # 9. Train the network:
-    #
-    # # In[13]:
-    #
-    #
-    # PRINT_EVERY = 50
-    # train_losses, valid_losses = [], []
-    #
-    # for epoch in range(N_EPOCHS):
-    #     running_loss_train = 0
-    #     running_loss_valid = 0
-    #
-    #     model.train()
-    #
-    #     for x_batch, y_batch in train_loader:
-    #
-    #         optimizer.zero_grad()
-    #
-    #         x_batch = x_batch.to(device)
-    #         x_batch = x_batch.view(x_batch.shape[0], 1, N_LAGS)
-    #         y_batch = y_batch.to(device)
-    #         y_batch = y_batch.view(y_batch.shape[0], 1, 1)
-    #         y_hat = model(x_batch).view(y_batch.shape[0], 1, 1)
-    #         loss = torch.sqrt(loss_fn(y_batch, y_hat))
-    #         loss.backward()
-    #         optimizer.step()
-    #         running_loss_train += loss.item() * x_batch.size(0)
-    #
-    #     epoch_loss_train = running_loss_train / len(train_loader.dataset)
-    #     train_losses.append(epoch_loss_train)
-    #
-    #     with torch.no_grad():
-    #         model.eval()
-    #         for x_val, y_val in valid_loader:
-    #             x_val = x_val.to(device)
-    #             x_val = x_val.view(x_val.shape[0], 1, N_LAGS)
-    #             y_val = y_val.to(device)
-    #             y_val = y_val.view(y_val.shape[0], 1, 1)
-    #             y_hat = model(x_val).view(y_val.shape[0], 1, 1)
-    #             loss = torch.sqrt(loss_fn(y_val, y_hat))
-    #             running_loss_valid += loss.item() * x_val.size(0)
-    #
-    #         epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
-    #
-    #         if epoch > 0 and epoch_loss_valid < min(valid_losses):
-    #             best_epoch = epoch
-    #             torch.save(model.state_dict(), './cnn_checkpoint.pth')
-    #
-    #         valid_losses.append(epoch_loss_valid)
-    #
-    #     if epoch % PRINT_EVERY == 0:
-    #         print(f"<{epoch}> - Train. loss: {epoch_loss_train:.6f} \t Valid. loss: {epoch_loss_valid:.6f}")
-    #
-    # print(f'Lowest loss recorded in epoch: {best_epoch}')
-    #
-    #
-    # # 10. Plot the losses over epochs:
-    #
-    # # In[14]:
-    #
-    #
-    # train_losses = np.array(train_losses)
-    # valid_losses = np.array(valid_losses)
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(train_losses, color='blue', label='Training loss')
-    # ax.plot(valid_losses, color='red', label='Validation loss')
-    #
-    # ax.set(title="Loss over epochs",
-    #        xlabel='Epoch',
-    #        ylabel='Loss')
-    # ax.legend()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im11.png')
-    # plt.show()
-    #
-    #
-    # # 11. Load the best model (with the lowest validation loss):
-    #
-    # # In[15]:
-    #
-    #
-    # state_dict = torch.load('cnn_checkpoint.pth')
-    # model.load_state_dict(state_dict)
-    #
-    #
-    # # 12. Obtain the predictions:
-    #
-    # # In[16]:
-    #
-    #
-    # y_pred, y_valid = [], []
-    #
-    # with torch.no_grad():
-    #
-    #     model.eval()
-    #
-    #     for x_val, y_val in valid_loader:
-    #         x_val = x_val.to(device)
-    #         x_val = x_val.view(x_val.shape[0], 1, N_LAGS)
-    #         y_pred.append(model(x_val))
-    #         y_valid.append(y_val)
-    #
-    # y_pred = torch.cat(y_pred).numpy().flatten()
-    # y_valid = torch.cat(y_valid).numpy().flatten()
-    #
-    #
-    # # 13. Evaluate the predictions:
-    #
-    # # In[17]:
-    #
-    #
-    # cnn_mse = mean_squared_error(y_valid, y_pred)
-    # cnn_rmse = np.sqrt(cnn_mse)
-    # print(f"CNN's forecast - MSE: {cnn_mse:.2f}, RMSE: {cnn_rmse:.2f}")
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(y_valid, color='blue', label='Actual')
-    # ax.plot(y_pred, color='red', label='Prediction')
-    # #ax.plot(naive_pred, color='green', label='Naïve')
-    #
-    # ax.set(title="CNN's Forecasts",
-    #        xlabel='Time',
-    #        ylabel='Price ($)')
-    # ax.legend()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im12.png')
-    # plt.show()
-    #
-    #
-    ## Recurrent neural networks for time series forecasting
+
+    ## Convolutional neural networks for time series forecasting
     print(torch.__version__)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     ic(device)
@@ -1314,14 +1024,18 @@ if __name__ == "__main__":
     END_DATE = datetime(2019, 12, 31)
     VALID_START = datetime(2019, 7, 1)
     N_LAGS = 12
+    # import torch
+    # import torch.optim as optim
+    # import torch.nn as nn
+    # from torch.utils.data import Dataset, TensorDataset, DataLoader, Subset
+    # from collections import OrderedDict
+    # from chapter_10_utils import create_input_data, custom_set_seed
+    #
+    # from sklearn.metrics import mean_squared_error
+    #
 
-    # neural network
-    BATCH_SIZE = 16
-    N_EPOCHS = 100
-
-    # df = yf.download(TICKER, start=START_DATE, end=END_DATE, progress=False)
-    # df.info()
-    # ic(df.head())
+    BATCH_SIZE = 5
+    N_EPOCHS = 2000
 
     src_data = "data/yf_intl.pkl"
     try:
@@ -1338,6 +1052,145 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
     ax.plot(df.index, prices)
     ax.set(title=f"{TICKER}'s Stock price", xlabel="Time", ylabel="Price ($)")
+
+    # 4. Transform the time series into input for the CNN:
+    X, y = create_input_data(prices, N_LAGS)
+
+    # 5. Obtain the naïve forecast:
+    naive_pred = prices[len(prices) - valid_size - 1 : -1]
+    y_valid = prices[len(prices) - valid_size :]
+
+    naive_mse = mean_squared_error(y_valid, naive_pred)
+    naive_rmse = np.sqrt(naive_mse)
+    print(f"Naive forecast - MSE: {naive_mse:.2f}, RMSE: {naive_rmse:.2f}")
+
+    # 6. Prepare the `DataLoader` objects:
+    custom_set_seed(42)
+    valid_ind = len(X) - valid_size
+    X_tensor = torch.from_numpy(X).float()
+    y_tensor = torch.from_numpy(y).float().unsqueeze(dim=1)
+    dataset = TensorDataset(X_tensor, y_tensor)
+    train_dataset = Subset(dataset, list(range(valid_ind)))
+    valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE)
+    valid_loader = DataLoader(dataset=valid_dataset, batch_size=BATCH_SIZE)
+
+    # Check the size of the datasets:
+    print(
+        f"Size of datasets - training: {len(train_loader.dataset)} | validation: {len(valid_loader.dataset)}"
+    )
+
+    class Flatten(nn.Module):
+        @staticmethod
+        def forward(x):
+            return x.view(x.size()[0], -1)
+
+    model = nn.Sequential(
+        OrderedDict(
+            [
+                ("conv_1", nn.Conv1d(1, 32, 3, padding=1)),
+                ("max_pool_1", nn.MaxPool1d(2)),
+                ("relu_1", nn.ReLU()),
+                ("flatten", Flatten()),
+                ("fc_1", nn.Linear(192, 50)),
+                ("relu_2", nn.ReLU()),
+                ("dropout_1", nn.Dropout(0.4)),
+                ("fc_2", nn.Linear(50, 1)),
+            ]
+        )
+    )
+    print(model)
+
+    model = model.to(device)
+    loss_fn = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    PRINT_EVERY = 50
+    train_losses, valid_losses = [], []
+    for epoch in range(N_EPOCHS):
+        running_loss_train = 0
+        running_loss_valid = 0
+        model.train()
+        for x_batch, y_batch in train_loader:
+            optimizer.zero_grad()
+            x_batch = x_batch.to(device)
+            x_batch = x_batch.view(x_batch.shape[0], 1, N_LAGS)
+            y_batch = y_batch.to(device)
+            y_batch = y_batch.view(y_batch.shape[0], 1, 1)
+            y_hat = model(x_batch).view(y_batch.shape[0], 1, 1)
+            loss = torch.sqrt(loss_fn(y_batch, y_hat))
+            loss.backward()
+            optimizer.step()
+            running_loss_train += loss.item() * x_batch.size(0)
+        epoch_loss_train = running_loss_train / len(train_loader.dataset)
+        train_losses.append(epoch_loss_train)
+
+        with torch.no_grad():
+            model.eval()
+            for x_val, y_val in valid_loader:
+                x_val = x_val.to(device)
+                x_val = x_val.view(x_val.shape[0], 1, N_LAGS)
+                y_val = y_val.to(device)
+                y_val = y_val.view(y_val.shape[0], 1, 1)
+                y_hat = model(x_val).view(y_val.shape[0], 1, 1)
+                loss = torch.sqrt(loss_fn(y_val, y_hat))
+                running_loss_valid += loss.item() * x_val.size(0)
+            epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
+            if epoch > 0 and epoch_loss_valid < min(valid_losses):
+                best_epoch = epoch
+                torch.save(model.state_dict(), "data/cnn_checkpoint.pth")
+            valid_losses.append(epoch_loss_valid)
+        if epoch % PRINT_EVERY == 0:
+            print(
+                f"<{epoch}> - Train. loss: {epoch_loss_train:.6f} \t Valid. loss: {epoch_loss_valid:.6f}"
+            )
+    print(f"Lowest loss recorded in epoch: {best_epoch}")
+
+    train_losses = np.array(train_losses)
+    valid_losses = np.array(valid_losses)
+
+    fig, ax = plt.subplots()
+    ax.plot(train_losses, color="blue", label="Training loss")
+    ax.plot(valid_losses, color="red", label="Validation loss")
+
+    ax.set(title="Loss over epochs", xlabel="Epoch", ylabel="Loss")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im11.png")
+
+    # 11. Load the best model (with the lowest validation loss):
+    state_dict = torch.load("data/cnn_checkpoint.pth")
+    model.load_state_dict(state_dict)
+    # 12. Obtain the predictions:
+    y_pred, y_valid = [], []
+    with torch.no_grad():
+        model.eval()
+        for x_val, y_val in valid_loader:
+            x_val = x_val.to(device)
+            x_val = x_val.view(x_val.shape[0], 1, N_LAGS)
+            y_pred.append(model(x_val))
+            y_valid.append(y_val)
+    y_pred = torch.cat(y_pred).numpy().flatten()
+    y_valid = torch.cat(y_valid).numpy().flatten()
+
+    # 13. Evaluate the predictions:
+    cnn_mse = mean_squared_error(y_valid, y_pred)
+    cnn_rmse = np.sqrt(cnn_mse)
+    print(f"CNN's forecast - MSE: {cnn_mse:.2f}, RMSE: {cnn_rmse:.2f}")
+
+    fig, ax = plt.subplots()
+    ax.plot(y_valid, color="blue", label="Actual")
+    ax.plot(y_pred, color="red", label="Prediction")
+    ax.plot(naive_pred, color="green", label="Naïve")
+    ax.set(title="CNN's Forecasts", xlabel="Time", ylabel="Price ($)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im12.png")
+
+    ## Recurrent neural networks for time series forecasting
+    BATCH_SIZE = 16
+    N_EPOCHS = 100
 
     # 4. Scale the time series of prices:
     valid_ind = len(prices) - valid_size
