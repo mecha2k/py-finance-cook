@@ -4,7 +4,21 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 import random
+import plotly.express as px
+import plotly.io as pio
+import pandas_profiling
+import missingno
+import category_encoders as ce
+import pydotplus
 
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn import metrics
+from io import StringIO
+from ipywidgets import Image
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
 from datetime import date, datetime
 from dotenv import load_dotenv
 from icecream import ic
@@ -39,6 +53,102 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # to significantly change the underlying structure/patterns in the data.
 # downloading the data
 # !wget https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls
+
+
+def performance_evaluation_report(
+    model, X_test, y_test, show_plot=False, labels=None, show_pr_curve=False
+):
+    """
+    Function for creating a performance report of a classification model.
+    Parameters
+    ----------
+    model : scikit-learn estimator
+        A fitted estimator for classification problems.
+    X_test : pd.DataFrame
+        DataFrame with features matching y_test
+    y_test : array/pd.Series
+        Target of a classification problem.
+    show_plot : bool
+        Flag whether to show the plot
+    labels : list
+        List with the class names.
+    show_pr_curve : bool
+        Flag whether to also show the PR-curve. For this to take effect,
+        show_plot must be True.
+    Return
+    ------
+    stats : pd.Series
+        A series with the most important evaluation metrics
+    """
+    y_pred = model.predict(X_test)
+    y_pred_prob = model.predict_proba(X_test)[:, 1]
+
+    cm = metrics.confusion_matrix(y_test, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+
+    fpr, tpr, threshold = metrics.roc_curve(y_test, y_pred_prob)
+    roc_auc = metrics.auc(fpr, tpr)
+
+    precision, recall, thresholds = metrics.precision_recall_curve(y_test, y_pred_prob)
+    pr_auc = metrics.auc(recall, precision)
+
+    if show_plot:
+        if labels is None:
+            labels = ["Negative", "Positive"]
+        N_SUBPLOTS = 3 if show_pr_curve else 2
+        PLOT_WIDTH = 15 if show_pr_curve else 12
+        PLOT_HEIGHT = 5 if show_pr_curve else 6
+
+        fig, ax = plt.subplots(1, N_SUBPLOTS, figsize=(PLOT_WIDTH, PLOT_HEIGHT))
+        fig.suptitle("Performance Evaluation", fontsize=16)
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            linewidths=0.5,
+            cmap="BuGn_r",
+            square=True,
+            cbar=False,
+            ax=ax[0],
+            annot_kws={"ha": "center", "va": "center"},
+        )
+        ax[0].set(xlabel="Predicted label", ylabel="Actual label", title="Confusion Matrix")
+        ax[0].xaxis.set_ticklabels(labels)
+        ax[0].yaxis.set_ticklabels(labels)
+        ax[1].plot(fpr, tpr, "b-", label=f"ROC-AUC = {roc_auc:.2f}")
+        ax[1].set(xlabel="False Positive Rate", ylabel="True Positive Rate", title="ROC Curve")
+        ax[1].plot(fp / (fp + tn), tp / (tp + fn), "ro", markersize=8, label="Decision Point")
+        ax[1].plot([0, 1], [0, 1], "r--")
+        ax[1].legend(loc="lower right")
+
+        if show_pr_curve:
+            ax[2].plot(recall, precision, label=f"PR-AUC = {pr_auc:.2f}")
+            ax[2].set(xlabel="Recall", ylabel="Precision", title="Precision-Recall Curve")
+            ax[2].legend()
+
+    #         print('#######################')
+    #         print('Evaluation metrics ####')
+    #         print('#######################')
+    #         print(f'Accuracy: {metrics.accuracy_score(y_test, y_pred):.4f}')
+    #         print(f'Precision: {metrics.precision_score(y_test, y_pred):.4f}')
+    #         print(f'Recall (Sensitivity): {metrics.recall_score(y_test, y_pred):.4f}')
+    #         print(f'Specificity: {(tn / (tn + fp)):.4f}')
+    #         print(f'F1-Score: {metrics.f1_score(y_test, y_pred):.4f}')
+    #         print(f"Cohen's Kappa: {metrics.cohen_kappa_score(y_test, y_pred):.4f}")
+
+    stats = {
+        "accuracy": metrics.accuracy_score(y_test, y_pred),
+        "precision": metrics.precision_score(y_test, y_pred),
+        "recall": metrics.recall_score(y_test, y_pred),
+        "specificity": (tn / (tn + fp)),
+        "f1_score": metrics.f1_score(y_test, y_pred),
+        "cohens_kappa": metrics.cohen_kappa_score(y_test, y_pred),
+        "roc_auc": roc_auc,
+        "pr_auc": pr_auc,
+    }
+
+    return stats
+
 
 if __name__ == "__main__":
     # loading the data from Excel
@@ -143,653 +253,301 @@ if __name__ == "__main__":
     get_df_memory_usage(df_cat2)
     df_cat.equals(df_cat2)
 
-    # # ## Exploratory Data Analysis
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[15]:
-    #
-    #
-    # import pandas as pd
-    # import seaborn as sns
-    # import numpy as np
-    # import plotly.express as px
-    # import plotly.io as pio
-    #
-    #
-    # # 2. Get summary statistics for numeric variables:
-    #
-    # # In[18]:
-    #
-    #
-    # df.describe().transpose().round(2)
-    #
-    #
-    # # 3. Get summary statistics for categorical variables:
-    #
-    # # In[19]:
-    #
-    #
-    # df.describe(include='object').transpose()
-    #
-    #
-    # # 4. Plot the distribution of age and split it by gender:
-    #
-    # # In[20]:
-    #
-    #
-    # fig, ax = plt.subplots()
-    # sns.distplot(df.loc[df.sex=='Male', 'age'].dropna(),
-    #              hist=False, color='green',
-    #              kde_kws={'shade': True},
-    #              ax=ax, label='Male')
-    # sns.distplot(df.loc[df.sex=='Female', 'age'].dropna(),
-    #              hist=False, color='blue',
-    #              kde_kws={'shade': True},
-    #              ax=ax, label='Female')
-    # ax.set_title('Distribution of age')
-    # ax.legend(title='Gender:')
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im5.png')
-    # plt.show()
-    #
-    #
-    # # As mentioned in the text, we can create a histogram (together with the KDE), by calling:
-    #
-    # # In[21]:
-    #
-    #
-    # ax = sns.distplot(df.age.dropna(), )
-    # ax.set_title('Distribution of age');
-    #
-    #
-    # # We noticed some spikes appearing every ~10 years and the reason for this is the binning. Below, we created the same histogram using `sns.countplot` and `plotly_express`. By doing so, each value of age has a separate bin and we can inspect the plot in detail. There are no such spikes in the following plots:
-    #
-    # # In[22]:
-    #
-    #
-    # plot_ = sns.countplot(x=df.age.dropna(), color='blue')
-    #
-    # for ind, label in enumerate(plot_.get_xticklabels()):
-    #     if int(float(label.get_text())) % 10 == 0:
-    #         label.set_visible(True)
-    #     else:
-    #         label.set_visible(False)
-    #
-    #
-    # # In[24]:
-    #
-    #
-    # px.histogram(df, x='age', title = 'Distribution of age')
-    #
-    #
-    # # 5. Plot a `pairplot` of selected variables:
-    #
-    # # In[23]:
-    #
-    #
-    # pair_plot = sns.pairplot(df[['age', 'limit_bal', 'previous_payment_sep']])
-    # pair_plot.fig.suptitle('Pairplot of selected variables', y=1.05)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im6.png', bbox_inches='tight')
-    # plt.show()
-    #
-    #
-    # # Additionally, we can separate the genders by specifying the `hue` argument:
-    #
-    # # In[18]:
-    #
-    #
-    # # pair_plot = sns.pairplot(df[['sex', 'age', 'limit_bal', 'previous_payment_sep']],
-    # #                          hue='sex')
-    # # pair_plot.fig.suptitle('Pairplot of selected variables', y=1.05);
-    #
-    #
-    # # 6. Define and run a function for plotting the correlation heatmap:
-    #
-    # # In[25]:
-    #
-    #
-    # def plot_correlation_matrix(corr_mat):
-    #     '''
-    #     Function for plotting the correlation heatmap. It masks the irrelevant fields.
-    #
-    #     Parameters
-    #     ----------
-    #     corr_mat : pd.DataFrame
-    #         Correlation matrix of the features.
-    #     '''
-    #
-    #     # temporarily change style
-    #     sns.set(style='white')
-    #     # mask the upper triangle
-    #     mask = np.zeros_like(corr_mat, dtype=np.bool)
-    #     mask[np.triu_indices_from(mask)] = True
-    #     # set up the matplotlib figure
-    #     fig, ax = plt.subplots()
-    #     # set up custom diverging colormap
-    #     cmap = sns.diverging_palette(240, 10, n=9, as_cmap=True)
-    #     # plot the heatmap
-    #     sns.heatmap(corr_mat, mask=mask, cmap=cmap, vmax=.3, center=0,
-    #                 square=True, linewidths=.5,
-    #                 cbar_kws={'shrink': .5}, ax=ax)
-    #     ax.set_title('Correlation Matrix', fontsize=16)
-    #     # change back to darkgrid style
-    #     sns.set(style='darkgrid')
-    #
-    #
-    # # In[36]:
-    #
-    #
-    # corr_mat = df.select_dtypes(include='number').corr()
-    # plot_correlation_matrix(corr_mat)
-    #
-    # plt.tight_layout()
-    # #plt.savefig('images/ch8_im7.png')
-    # plt.show()
-    #
-    #
-    # # We can also directly inspect the correlation between the features (numerical) and the target:
-    #
-    # # In[26]:
-    #
-    #
-    # df.select_dtypes(include='number').corr()[['default_payment_next_month']]
-    #
-    #
-    # # 7. Plot the distribution of limit balance for each gender and education level:
-    #
-    # # In[27]:
-    #
-    #
-    # ax = sns.violinplot(x='education', y='limit_bal',
-    #                     hue='sex', split=True, data=df)
-    # ax.set_title('Distribution of limit balance per education level',
-    #              fontsize=16)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im8.png')
-    # plt.show()
-    #
-    #
-    # # The following code plots the same information, without splitting the violin plots.
-    #
-    # # In[19]:
-    #
-    #
-    # # ax = sns.violinplot(x='education', y='limit_bal',
-    # #                     hue='sex', data=df)
-    # # ax.set_title('Distribution of limit balance per education level',
-    # #              fontsize=16);
-    #
-    #
-    # # 8. Investigate the distribution of the target variable per gender and education level:
-    #
-    # # In[29]:
-    #
-    #
-    # ax = sns.countplot('default_payment_next_month', hue='sex',
-    #                    data=df, orient='h')
-    # ax.set_title('Distribution of the target variable', fontsize=16)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im9.png')
-    # plt.show()
-    #
-    #
-    # # 9. Investigate the percentage of defaults per education level:
-    #
-    # # In[30]:
-    #
-    #
-    # ax = df.groupby('education')['default_payment_next_month']        .value_counts(normalize=True)        .unstack()        .plot(kind='barh', stacked='True')
-    # ax.set_title('Percentage of default per education level',
-    #              fontsize=16)
-    # ax.legend(title='Default', bbox_to_anchor=(1,1))
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im10.png')
-    # plt.show()
-    #
-    #
-    # # ### There's more
-    #
-    # # In[ ]:
-    #
-    #
-    # # import pandas_profiling
-    # # df.profile_report()
-    #
-    #
-    # # ## Splitting the data into training and test sets
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the function from `sklearn`:
-    #
-    # # In[15]:
-    #
-    #
-    # from sklearn.model_selection import train_test_split
-    #
-    #
-    # # 2. Split the data into training and test sets:
-    #
-    # # In[22]:
-    #
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     random_state=42)
-    #
-    #
-    # # 3. Split the data into training and test sets without shuffling:
-    #
-    # # In[23]:
-    #
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     shuffle=False)
-    #
-    #
-    # # 4. Split the data into training and test sets with stratification:
-    #
-    # # In[16]:
-    #
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     stratify=y,
-    #                                                     random_state=42)
-    #
-    #
-    # # 5. Verify that the ratio of the target is preserved:
-    #
-    # # In[25]:
-    #
-    #
-    # y_train.value_counts(normalize=True)
-    #
-    #
-    # # In[26]:
-    #
-    #
-    # y_test.value_counts(normalize=True)
-    #
-    #
-    # # ### There's more
-    #
-    # # In[27]:
-    #
-    #
-    # # # define the size of the validation and test sets
-    # # VALID_SIZE = 0.1
-    # # TEST_SIZE = 0.2
-    #
-    # # # create the initial split - training and temp
-    # # X_train, X_temp, y_train, y_temp = train_test_split(X, y,
-    # #                                                     test_size=(VALID_SIZE + TEST_SIZE),
-    # #                                                     stratify=y,
-    # #                                                     random_state=42)
-    #
-    # # # calculate the new test size
-    # # NEW_TEST_SIZE = np.around(TEST_SIZE / (VALID_SIZE + TEST_SIZE), 2)
-    #
-    # # # create the valid and test sets
-    # # X_valid, X_test, y_valid, y_test = train_test_split(X_temp, y_temp,
-    # #                                                     test_size=NEW_TEST_SIZE,
-    # #                                                     stratify=y_temp,
-    # #                                                     random_state=42)
-    #
-    #
-    # # ## Dealing with missing values
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[17]:
-    #
-    #
-    # import pandas as pd
-    # import missingno
-    # from sklearn.impute import SimpleImputer
-    #
-    #
-    # # 2. Inspect the information about the DataFrame:
-    #
-    # # In[18]:
-    #
-    #
-    # X.info()
-    #
-    #
-    # # 3. Visualize the nullity of the DataFrame:
-    #
-    # # In[19]:
-    #
-    #
-    # missingno.matrix(X)
-    #
-    # # plt.savefig('images/ch8_im12.png')
-    # plt.show()
-    #
-    #
-    # # 4. Define columns with missing values per data type:
-    #
-    # # In[20]:
-    #
-    #
-    # NUM_FEATURES = ['age']
-    # CAT_FEATURES = ['sex', 'education', 'marriage']
-    #
-    #
-    # # 5. Impute the numerical feature:
-    #
-    # # In[21]:
-    #
-    #
-    # for col in NUM_FEATURES:
-    #     num_imputer = SimpleImputer(strategy='median')
-    #     num_imputer.fit(X_train[[col]])
-    #     X_train.loc[:, col] = num_imputer.transform(X_train[[col]])
-    #     X_test.loc[:, col] = num_imputer.transform(X_test[[col]])
-    #
-    #
-    # # In[22]:
-    #
-    #
-    # # alternative method using pandas
-    #
-    # # for feature in NUM_FEATURES:
-    # #     median_value = X_train[feature].median()
-    # #     X_train.loc[:, feature].fillna(median_value, inplace=True)
-    # #     X_test.loc[:, feature].fillna(median_value, inplace=True)
-    #
-    #
-    # # 6. Impute the categorical features:
-    #
-    # # In[23]:
-    #
-    #
-    # for col in CAT_FEATURES:
-    #     cat_imputer = SimpleImputer(strategy='most_frequent')
-    #     cat_imputer.fit(X_train[[col]])
-    #     X_train.loc[:, col] = cat_imputer.transform(X_train[[col]])
-    #     X_test.loc[:, col] = cat_imputer.transform(X_test[[col]])
-    #
-    #
-    # # In[24]:
-    #
-    #
-    # # alternative method using pandas
-    #
-    # # for feature in CAT_FEATURES:
-    # #     mode_value = X_train[feature].mode().values[0]
-    # #     X_train.loc[:, feature].fillna(mode_value, inplace=True)
-    # #     X_test.loc[:, feature].fillna(mode_value, inplace=True)
-    #
-    #
-    # # 7. Verify that there are no missing values:
-    #
-    # # In[25]:
-    #
-    #
-    # X_train.info()
-    #
-    #
-    # # ## Encoding categorical variables
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[34]:
-    #
-    #
-    # import pandas as pd
-    # from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-    # from sklearn.compose import ColumnTransformer
-    #
-    #
-    # # 2. Use Label Encoder to encode a selected column:
-    #
-    # # In[35]:
-    #
-    #
-    # COL = 'education'
-    #
-    # X_train_copy = X_train.copy()
-    # X_test_copy = X_test.copy()
-    #
-    # label_enc = LabelEncoder()
-    # label_enc.fit(X_train_copy[COL])
-    # X_train_copy.loc[:, COL] = label_enc.transform(X_train_copy[COL])
-    # X_test_copy.loc[:, COL] = label_enc.transform(X_test_copy[COL])
-    #
-    #
-    # # 3. Select categorical features for one-hot encoding:
-    #
-    # # In[36]:
-    #
-    #
-    # CAT_FEATURES = X_train.select_dtypes(include='object')                       .columns                       .to_list()
-    #
-    #
-    # # 4. Instantiate the One-Hot Encoder object:
-    #
-    # # In[37]:
-    #
-    #
-    # one_hot_encoder = OneHotEncoder(sparse=False,
-    #                                 handle_unknown='error',
-    #                                 drop='first')
-    #
-    #
-    # # 5. Create the column transformer using the one-hot encoder:
-    #
-    # # In[38]:
-    #
-    #
-    # one_hot_transformer = ColumnTransformer(
-    #     [("one_hot", one_hot_encoder, CAT_FEATURES)]
-    #     #,remainder='passthrough'
-    # )
-    #
-    #
-    # # 6. Fit the transformer:
-    #
-    # # In[39]:
-    #
-    #
-    # one_hot_transformer.fit(X_train)
-    #
-    #
-    # # 7. Apply the transformations to both training and test sets:
-    #
-    # # In[40]:
-    #
-    #
-    # col_names = one_hot_transformer.get_feature_names()
-    #
-    # X_train_cat = pd.DataFrame(one_hot_transformer.transform(X_train),
-    #                            columns=col_names,
-    #                            index=X_train.index)
-    # X_train_ohe = pd.concat([X_train, X_train_cat], axis=1)                 .drop(CAT_FEATURES, axis=1)
-    #
-    # X_test_cat = pd.DataFrame(one_hot_transformer.transform(X_test),
-    #                           columns=col_names,
-    #                           index=X_test.index)
-    # X_test_ohe = pd.concat([X_test, X_test_cat], axis=1)                .drop(CAT_FEATURES, axis=1)
-    #
-    #
-    # # ### There's more
-    #
-    # # #### Using `pandas.get_dummies` for one-hot encoding
-    #
-    # # In[53]:
-    #
-    #
-    # pd.get_dummies(X_train, prefix_sep='_', drop_first=True)
-    #
-    #
-    # # #### Specifying possible categories for OneHotEncoder
-    #
-    # # In[54]:
-    #
-    #
-    # one_hot_encoder = OneHotEncoder(
-    #     categories=[['Male', 'Female', 'Unknown']],
-    #     sparse=False,
-    #     handle_unknown='error',
-    #     drop='first'
-    # )
-    #
-    # one_hot_transformer = ColumnTransformer(
-    #     [("one_hot", one_hot_encoder, ['sex'])]
-    # )
-    #
-    # one_hot_transformer.fit(X_train)
-    # one_hot_transformer.get_feature_names()
-    #
-    #
-    # # #### Category Encoders library
-    #
-    # # In[55]:
-    #
-    #
-    # import category_encoders as ce
-    #
-    #
-    # # In[56]:
-    #
-    #
-    # one_hot_encoder_ce = ce.OneHotEncoder(use_cat_names=True)
-    #
-    #
-    # # In[57]:
-    #
-    #
-    # one_hot_encoder_ce.fit(X_train)
-    # X_train_ce = one_hot_encoder_ce.transform(X_train)
-    # X_train_ce.head()
-    #
-    #
-    # # In[58]:
-    #
-    #
-    # target_encoder = ce.TargetEncoder(smoothing=0)
-    # target_encoder.fit(X_train.sex, y_train)
-    # target_encoder.transform(X_train.sex).head()
-    #
-    #
-    # # ## Fitting a decision tree classifier
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[41]:
-    #
-    #
-    # from sklearn.tree import DecisionTreeClassifier, export_graphviz
-    # from sklearn import metrics
-    #
-    # from chapter_8_utils import performance_evaluation_report
-    #
-    # from io import StringIO
-    # import seaborn as sns
-    # from ipywidgets import Image
-    # import pydotplus
-    #
-    #
-    # # 2. Create the instance of the model, fit it to the training data and create prediction:
-    #
-    # # In[42]:
-    #
-    #
-    # tree_classifier = DecisionTreeClassifier(random_state=42)
-    # tree_classifier.fit(X_train_ohe, y_train)
-    # y_pred = tree_classifier.predict(X_test_ohe)
-    #
-    #
-    # # 3. Evaluate the results:
-    #
-    # # In[43]:
-    #
-    #
-    # LABELS = ['No Default', 'Default']
-    # tree_perf = performance_evaluation_report(tree_classifier,
-    #                                           X_test_ohe,
-    #                                           y_test, labels=LABELS,
-    #                                           show_plot=True)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im14.png')
-    # plt.show()
-    #
-    #
-    # # In[44]:
-    #
-    #
-    # tree_perf
-    #
-    #
-    # # 4. Plot the simplified Decision Tree:
-    #
-    # # In[66]:
-    #
-    #
-    # small_tree = DecisionTreeClassifier(max_depth=3,
-    #                                     random_state=42)
-    # small_tree.fit(X_train_ohe, y_train)
-    #
-    # tree_dot = StringIO()
-    # export_graphviz(small_tree, feature_names=X_train_ohe.columns,
-    #                 class_names=LABELS, rounded=True, out_file=tree_dot,
-    #                 proportion=False, precision=2, filled=True)
-    # tree_graph = pydotplus.graph_from_dot_data(tree_dot.getvalue())
-    # tree_graph.set_dpi(300)
-    # # tree_graph.write_png('images/ch8_im15.png')
-    # Image(value=tree_graph.create_png())
-    #
-    #
-    # # ### There's more
-    #
-    # # In[45]:
-    #
-    #
-    # y_pred_prob = tree_classifier.predict_proba(X_test_ohe)[:, 1]
-    #
-    #
-    # # In[46]:
-    #
-    #
-    # precision, recall, thresholds = metrics.precision_recall_curve(y_test,
-    #                                                                y_pred_prob)
-    #
-    #
-    # # In[47]:
-    #
-    #
-    # ax = plt.subplot()
-    # ax.plot(recall, precision,
-    #         label=f'PR-AUC = {metrics.auc(recall, precision):.2f}')
-    # ax.set(title='Precision-Recall Curve',
-    #        xlabel='Recall',
-    #        ylabel='Precision')
-    # ax.legend()
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im16.png')
-    # plt.show()
-    #
-    #
+    df.describe().transpose().round(2)
+    df.describe(include="object").transpose()
+
+    fig, ax = plt.subplots()
+    sns.distplot(
+        df.loc[df.sex == "Male", "age"].dropna(),
+        hist=False,
+        color="green",
+        kde_kws={"shade": True},
+        ax=ax,
+        label="Male",
+    )
+    sns.distplot(
+        df.loc[df.sex == "Female", "age"].dropna(),
+        hist=False,
+        color="blue",
+        kde_kws={"shade": True},
+        ax=ax,
+        label="Female",
+    )
+    ax.set_title("Distribution of age")
+    ax.legend(title="Gender:")
+    plt.tight_layout()
+    plt.savefig("images/ch8_im5.png")
+
+    # As mentioned in the text, we can create a histogram (together with the KDE), by calling:
+    ax = sns.distplot(
+        df.age.dropna(),
+    )
+    ax.set_title("Distribution of age")
+    # We noticed some spikes appearing every ~10 years and the reason for this is the binning.
+    # Below, we created the same histogram using `sns.countplot` and `plotly_express`. By doing so,
+    # each value of age has a separate bin and we can inspect the plot in detail.
+    # There are no such spikes in the following plots:
+
+    plot_ = sns.countplot(x=df.age.dropna(), color="blue")
+    for ind, label in enumerate(plot_.get_xticklabels()):
+        if int(float(label.get_text())) % 10 == 0:
+            label.set_visible(True)
+        else:
+            label.set_visible(False)
+    px.histogram(df, x="age", title="Distribution of age")
+
+    pair_plot = sns.pairplot(df[["age", "limit_bal", "previous_payment_sep"]])
+    pair_plot.fig.suptitle("Pairplot of selected variables", y=1.05)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im6.png", bbox_inches="tight")
+
+    # Additionally, we can separate the genders by specifying the `hue` argument:
+    pair_plot = sns.pairplot(df[["sex", "age", "limit_bal", "previous_payment_sep"]], hue="sex")
+    pair_plot.fig.suptitle("Pairplot of selected variables", y=1.05)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im6_1.png")
+
+    def plot_correlation_matrix(corr_mat):
+        """
+        Function for plotting the correlation heatmap. It masks the irrelevant fields.
+        Parameters
+        ----------
+        corr_mat : pd.DataFrame
+            Correlation matrix of the features.
+        """
+        # temporarily change style
+        sns.set(style="white")
+        # mask the upper triangle
+        mask = np.zeros_like(corr_mat, dtype=bool)
+        mask[np.triu_indices_from(mask)] = True
+        # set up the matplotlib figure
+        fig, ax = plt.subplots()
+        # set up custom diverging colormap
+        cmap = sns.diverging_palette(240, 10, n=9, as_cmap=True)
+        # plot the heatmap
+        sns.heatmap(
+            corr_mat,
+            mask=mask,
+            cmap=cmap,
+            vmax=0.3,
+            center=0,
+            square=True,
+            linewidths=0.5,
+            cbar_kws={"shrink": 0.5},
+            ax=ax,
+        )
+        ax.set_title("Correlation Matrix", fontsize=16)
+        # change back to darkgrid style
+        sns.set(style="darkgrid")
+
+    corr_mat = df.select_dtypes(include="number").corr()
+    plot_correlation_matrix(corr_mat)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im7.png")
+
+    # We can also directly inspect the correlation between the features (numerical) and the target:
+    ic(df.select_dtypes(include="number").corr()[["default_payment_next_month"]])
+
+    # 7. Plot the distribution of limit balance for each gender and education level:
+    ax = sns.violinplot(x="education", y="limit_bal", hue="sex", split=True, data=df)
+    ax.set_title("Distribution of limit balance per education level", fontsize=16)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im8.png")
+    plt.close()
+
+    # The following code plots the same information, without splitting the violin plots.
+    ax = sns.violinplot(x="education", y="limit_bal", hue="sex", data=df)
+    ax.set_title("Distribution of limit balance per education level", fontsize=16)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im81.png")
+    plt.close()
+
+    # 8. Investigate the distribution of the target variable per gender and education level:
+    ax = sns.countplot("default_payment_next_month", hue="sex", data=df, orient="h")
+    ax.set_title("Distribution of the target variable", fontsize=16)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im9.png")
+
+    # 9. Investigate the percentage of defaults per education level:
+    ax = (
+        df.groupby("education")["default_payment_next_month"]
+        .value_counts(normalize=True)
+        .unstack()
+        .plot(kind="barh", stacked="True")
+    )
+    ax.set_title("Percentage of default per education level", fontsize=16)
+    ax.legend(title="Default", bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    plt.savefig("images/ch8_im10.png")
+    plt.close()
+
+    ic(df.profile_report())
+
+    ## Splitting the data into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # 3. Split the data into training and test sets without shuffling:
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    # 4. Split the data into training and test sets with stratification:
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+    # 5. Verify that the ratio of the target is preserved:
+    y_train.value_counts(normalize=True)
+    y_test.value_counts(normalize=True)
+
+    # define the size of the validation and test sets
+    VALID_SIZE = 0.1
+    TEST_SIZE = 0.2
+    # create the initial split - training and temp
+    X_train, X_temp, y_train, y_temp = train_test_split(
+        X, y, test_size=(VALID_SIZE + TEST_SIZE), stratify=y, random_state=42
+    )
+
+    # calculate the new test size
+    NEW_TEST_SIZE = np.around(TEST_SIZE / (VALID_SIZE + TEST_SIZE), 2)
+    # create the valid and test sets
+    X_valid, X_test, y_valid, y_test = train_test_split(
+        X_temp, y_temp, test_size=NEW_TEST_SIZE, stratify=y_temp, random_state=42
+    )
+
+    ## Dealing with missing values
+    X.info()
+
+    missingno.matrix(X)
+    plt.savefig("images/ch8_im12.png")
+
+    # 4. Define columns with missing values per data type:
+    NUM_FEATURES = ["age"]
+    CAT_FEATURES = ["sex", "education", "marriage"]
+
+    # 5. Impute the numerical feature:
+    for col in NUM_FEATURES:
+        num_imputer = SimpleImputer(strategy="median")
+        num_imputer.fit(X_train[[col]])
+        X_train.loc[:, col] = num_imputer.transform(X_train[[col]])
+        X_test.loc[:, col] = num_imputer.transform(X_test[[col]])
+
+    # alternative method using pandas
+    # for feature in NUM_FEATURES:
+    #     median_value = X_train[feature].median()
+    #     X_train.loc[:, feature].fillna(median_value, inplace=True)
+    #     X_test.loc[:, feature].fillna(median_value, inplace=True)
+
+    # 6. Impute the categorical features:
+    for col in CAT_FEATURES:
+        cat_imputer = SimpleImputer(strategy="most_frequent")
+        cat_imputer.fit(X_train[[col]])
+        X_train.loc[:, col] = cat_imputer.transform(X_train[[col]])
+        X_test.loc[:, col] = cat_imputer.transform(X_test[[col]])
+
+    # alternative method using pandas
+    # for feature in CAT_FEATURES:
+    #     mode_value = X_train[feature].mode().values[0]
+    #     X_train.loc[:, feature].fillna(mode_value, inplace=True)
+    #     X_test.loc[:, feature].fillna(mode_value, inplace=True)
+
+    # 7. Verify that there are no missing values:
+    X_train.info()
+
+    ## Encoding categorical variables
+    # 2. Use Label Encoder to encode a selected column:
+    COL = "education"
+    X_train_copy = X_train.copy()
+    X_test_copy = X_test.copy()
+    label_enc = LabelEncoder()
+    label_enc.fit(X_train_copy[COL])
+    X_train_copy.loc[:, COL] = label_enc.transform(X_train_copy[COL])
+    X_test_copy.loc[:, COL] = label_enc.transform(X_test_copy[COL])
+    # 3. Select categorical features for one-hot encoding:
+    CAT_FEATURES = X_train.select_dtypes(include="object").columns.to_list()
+    # 4. Instantiate the One-Hot Encoder object:
+    one_hot_encoder = OneHotEncoder(sparse=False, handle_unknown="error", drop="first")
+    # 5. Create the column transformer using the one-hot encoder:
+    one_hot_transformer = ColumnTransformer(
+        [("one_hot", one_hot_encoder, CAT_FEATURES)]
+        # ,remainder='passthrough'
+    )
+    # 6. Fit the transformer:
+    one_hot_transformer.fit(X_train)
+    # 7. Apply the transformations to both training and test sets:
+    col_names = one_hot_transformer.get_feature_names()
+    X_train_cat = pd.DataFrame(
+        one_hot_transformer.transform(X_train), columns=col_names, index=X_train.index
+    )
+    X_train_ohe = pd.concat([X_train, X_train_cat], axis=1).drop(CAT_FEATURES, axis=1)
+
+    X_test_cat = pd.DataFrame(
+        one_hot_transformer.transform(X_test), columns=col_names, index=X_test.index
+    )
+    X_test_ohe = pd.concat([X_test, X_test_cat], axis=1).drop(CAT_FEATURES, axis=1)
+
+    #### Using `pandas.get_dummies` for one-hot encoding
+    pd.get_dummies(X_train, prefix_sep="_", drop_first=True)
+
+    #### Specifying possible categories for OneHotEncoder
+    one_hot_encoder = OneHotEncoder(
+        categories=[["Male", "Female", "Unknown"]],
+        sparse=False,
+        handle_unknown="error",
+        drop="first",
+    )
+    one_hot_transformer = ColumnTransformer([("one_hot", one_hot_encoder, ["sex"])])
+    one_hot_transformer.fit(X_train)
+    one_hot_transformer.get_feature_names()
+
+    #### Category Encoders library
+    one_hot_encoder_ce = ce.OneHotEncoder(use_cat_names=True)
+    one_hot_encoder_ce.fit(X_train)
+    X_train_ce = one_hot_encoder_ce.transform(X_train)
+    X_train_ce.head()
+
+    target_encoder = ce.TargetEncoder(smoothing=0)
+    target_encoder.fit(X_train.sex, y_train)
+    target_encoder.transform(X_train.sex).head()
+
+    ## Fitting a decision tree classifier
+    tree_classifier = DecisionTreeClassifier(random_state=42)
+    tree_classifier.fit(X_train_ohe, y_train)
+    y_pred = tree_classifier.predict(X_test_ohe)
+
+    LABELS = ["No Default", "Default"]
+    tree_perf = performance_evaluation_report(
+        tree_classifier, X_test_ohe, y_test, labels=LABELS, show_plot=True
+    )
+
+    plt.tight_layout()
+    plt.savefig("images/ch8_im14.png")
+    ic(tree_perf)
+
+    # 4. Plot the simplified Decision Tree:
+    small_tree = DecisionTreeClassifier(max_depth=3, random_state=42)
+    small_tree.fit(X_train_ohe, y_train)
+    tree_dot = StringIO()
+    export_graphviz(
+        small_tree,
+        feature_names=X_train_ohe.columns,
+        class_names=LABELS,
+        rounded=True,
+        out_file=tree_dot,
+        proportion=False,
+        precision=2,
+        filled=True,
+    )
+    tree_graph = pydotplus.graph_from_dot_data(tree_dot.getvalue())
+    tree_graph.set_dpi(300)
+    # tree_graph.write_png('images/ch8_im15.png')
+    Image(value=tree_graph.create_png())
+
+    y_pred_prob = tree_classifier.predict_proba(X_test_ohe)[:, 1]
+    precision, recall, thresholds = metrics.precision_recall_curve(y_test, y_pred_prob)
+
+    ax = plt.subplot()
+    ax.plot(recall, precision, label=f"PR-AUC = {metrics.auc(recall, precision):.2f}")
+    ax.set(title="Precision-Recall Curve", xlabel="Recall", ylabel="Precision")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch8_im16.png")
+
     # # ## Implementing scikit-learn's pipelines
     #
     # # ### How to do it...
@@ -1168,15 +926,3 @@ if __name__ == "__main__":
     # print(f'Best parameters: {classifier_gs_2.best_params_}')
     # print(f'Recall (Training set): {classifier_gs_2.best_score_:.4f}')
     # print(f'Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}')
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    #
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    #
