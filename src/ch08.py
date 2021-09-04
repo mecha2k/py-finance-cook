@@ -11,14 +11,27 @@ import missingno
 import category_encoders as ce
 import pydotplus
 
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
-from sklearn import metrics
 from io import StringIO
 from ipywidgets import Image
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.model_selection import (
+    GridSearchCV,
+    cross_val_score,
+    RandomizedSearchCV,
+    cross_validate,
+    StratifiedKFold,
+)
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn import metrics
 from datetime import date, datetime
 from dotenv import load_dotenv
 from icecream import ic
@@ -151,7 +164,6 @@ def performance_evaluation_report(
 
 
 if __name__ == "__main__":
-    # loading the data from Excel
     df = pd.read_excel("data/default of credit card clients.xlsx", skiprows=1, index_col=0)
     df.columns = df.columns.str.lower().str.replace(" ", "_")
 
@@ -412,7 +424,6 @@ if __name__ == "__main__":
 
     ## Dealing with missing values
     X.info()
-
     missingno.matrix(X)
     plt.savefig("images/ch8_im12.png")
 
@@ -548,381 +559,180 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig("images/ch8_im16.png")
 
-    # # ## Implementing scikit-learn's pipelines
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[1]:
-    #
-    #
-    # import pandas as pd
-    # from sklearn.model_selection import train_test_split
-    # from sklearn.impute import SimpleImputer
-    # from sklearn.preprocessing import OneHotEncoder
-    # from sklearn.compose import ColumnTransformer
-    # from sklearn.tree import DecisionTreeClassifier
-    # from sklearn.pipeline import Pipeline
-    # from chapter_8_utils import performance_evaluation_report
-    #
-    #
-    # # 2. Load the data, separate the target and create the stratified train-test split:
-    #
-    # # In[2]:
-    #
-    #
-    # df = pd.read_csv('../Datasets/credit_card_default.csv',
-    #                  index_col=0, na_values='')
-    #
-    # X = df.copy()
-    # y = X.pop('default_payment_next_month')
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     stratify=y,
-    #                                                     random_state=42)
-    #
-    #
-    # # 3. Store lists of numerical/categorical features:
-    #
-    # # In[3]:
-    #
-    #
-    # num_features = X_train.select_dtypes(include='number')                       .columns                       .to_list()
-    # cat_features = X_train.select_dtypes(include='object')                       .columns                       .to_list()
-    #
-    #
-    # # 4. Define the numerical pipeline:
-    #
-    # # In[4]:
-    #
-    #
-    # num_pipeline = Pipeline(steps=[
-    #     ('imputer', SimpleImputer(strategy='median'))
-    # ])
-    #
-    #
-    # # 5. Define the categorical pipeline:
-    #
-    # # In[5]:
-    #
-    #
-    # cat_list = [list(X_train[col].dropna().unique()) for col in cat_features]
-    #
-    # cat_pipeline = Pipeline(steps=[
-    #     ('imputer', SimpleImputer(strategy='most_frequent')),
-    #     ('onehot', OneHotEncoder(categories=cat_list, sparse=False,
-    #                              handle_unknown='error', drop='first'))
-    # ])
-    #
-    #
-    # # 6. Define the column transformer object:
-    #
-    # # In[6]:
-    #
-    #
-    # preprocessor = ColumnTransformer(transformers=[
-    #     ('numerical', num_pipeline, num_features),
-    #     ('categorical', cat_pipeline, cat_features)],
-    #     remainder='drop')
-    #
-    #
-    # # 7. Create the joint pipeline:
-    #
-    # # In[7]:
-    #
-    #
-    # dec_tree = DecisionTreeClassifier(random_state=42)
-    #
-    # tree_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-    #                                 ('classifier', dec_tree)])
-    #
-    #
-    # # 8. Fit the pipeline to the data:
-    #
-    # # In[8]:
-    #
-    #
-    # tree_pipeline.fit(X_train, y_train)
-    #
-    #
-    # # 9. Evaluate the performance of the entire pipeline:
-    #
-    # # In[12]:
-    #
-    #
-    # LABELS = ['No Default', 'Default']
-    # tree_perf = performance_evaluation_report(tree_pipeline, X_test,
-    #                                           y_test, labels=LABELS,
-    #                                           show_plot=True)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im17.png')
-    # plt.show()
-    #
-    #
-    # # In[12]:
-    #
-    #
-    # tree_perf
-    #
-    #
-    # # ### There's more
-    #
-    # # 1. Import the base estimator and transformer from `sklearn`:
-    #
-    # # In[13]:
-    #
-    #
-    # from sklearn.base import BaseEstimator, TransformerMixin
-    #
-    #
-    # # 2. Define the `OutlierRemover` class:
-    #
-    # # In[14]:
-    #
-    #
-    # class OutlierRemover(BaseEstimator, TransformerMixin):
-    #     def __init__(self, n_std=3):
-    #         self.n_std = n_std
-    #
-    #     def fit(self, X, y = None):
-    #         if np.isnan(X).any(axis=None):
-    #             raise ValueError('''There are missing values in the array!
-    #                                 Please remove them.''')
-    #
-    #         mean_vec = np.mean(X, axis=0)
-    #         std_vec = np.std(X, axis=0)
-    #
-    #         self.upper_band_ = mean_vec + self.n_std * std_vec
-    #         self.lower_band_ = mean_vec - self.n_std * std_vec
-    #         self.n_features_ = len(self.upper_band_)
-    #
-    #         return self
-    #
-    #     def transform(self, X, y = None):
-    #         X_copy = pd.DataFrame(X.copy())
-    #
-    #         upper_band = np.repeat(
-    #             self.upper_band_.reshape(self.n_features_, -1),
-    #             len(X_copy),
-    #             axis=1).transpose()
-    #         lower_band = np.repeat(
-    #             self.lower_band_.reshape(self.n_features_, -1),
-    #             len(X_copy),
-    #             axis=1).transpose()
-    #
-    #         X_copy[X_copy >= upper_band] = upper_band
-    #         X_copy[X_copy <= lower_band] = lower_band
-    #
-    #         return X_copy.values
-    #
-    #
-    # # 3. Add the `OutlierRemover` to the numerical Pipeline:
-    #
-    # # In[15]:
-    #
-    #
-    # num_pipeline = Pipeline(steps=[
-    #     ('imputer', SimpleImputer(strategy='median')),
-    #     ('outliers', OutlierRemover())
-    # ])
-    #
-    #
-    # # 4. Run the rest of the Pipeline, to compare the results:
-    #
-    # # In[16]:
-    #
-    #
-    # preprocessor = ColumnTransformer(transformers=[
-    #     ('numerical', num_pipeline, num_features),
-    #     ('categorical', cat_pipeline, cat_features)],
-    #     remainder='drop')
-    #
-    # dec_tree = DecisionTreeClassifier(random_state=42)
-    #
-    # tree_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-    #                                 ('classifier', dec_tree)])
-    #
-    # tree_pipeline.fit(X_train, y_train)
-    #
-    # tree_perf = performance_evaluation_report(tree_pipeline, X_test,
-    #                                           y_test, labels=LABELS,
-    #                                           show_plot=True)
-    #
-    # plt.tight_layout()
-    # # plt.savefig('images/ch8_im18.png')
-    # plt.show()
-    #
-    #
-    # # In[17]:
-    #
-    #
-    # tree_perf
-    #
-    #
-    # # ## Tuning hyperparameters using grid search and cross-validation
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[18]:
-    #
-    #
-    # from sklearn.model_selection import (GridSearchCV, cross_val_score,
-    #                                      RandomizedSearchCV, cross_validate,
-    #                                      StratifiedKFold)
-    # from sklearn import metrics
-    #
-    #
-    # # 2. Define the cross-validation scheme:
-    #
-    # # In[19]:
-    #
-    #
-    # k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
-    #
-    #
-    # # 3. Evaluate the pipeline using cross-validation:
-    #
-    # # In[20]:
-    #
-    #
-    # cross_val_score(tree_pipeline, X_train, y_train, cv=k_fold)
-    #
-    #
-    # # 4. Add extra metrics to cross-validation:
-    #
-    # # In[21]:
-    #
-    #
-    # cross_validate(tree_pipeline, X_train, y_train, cv=k_fold,
-    #                scoring=['accuracy', 'precision', 'recall',
-    #                         'roc_auc'])
-    #
-    #
-    # # 5. Define the parameter grid:
-    #
-    # # In[22]:
-    #
-    #
-    # param_grid = {'classifier__criterion': ['entropy', 'gini'],
-    #               'classifier__max_depth': range(3, 11),
-    #               'classifier__min_samples_leaf': range(2, 11),
-    #               'preprocessor__numerical__outliers__n_std': [3, 4]}
-    #
-    #
-    # # 6. Run Grid Search:
-    #
-    # # In[23]:
-    #
-    #
-    # classifier_gs = GridSearchCV(tree_pipeline, param_grid, scoring='recall',
-    #                              cv=k_fold, n_jobs=-1, verbose=1)
-    #
-    # classifier_gs.fit(X_train, y_train)
-    #
-    #
-    # # In[24]:
-    #
-    #
-    # print(f'Best parameters: {classifier_gs.best_params_}')
-    # print(f'Recall (Training set): {classifier_gs.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, classifier_gs.predict(X_test)):.4f}')
-    #
-    #
-    # # 7. Evaluate the performance of the Grid Search:
-    #
-    # # In[25]:
-    #
-    #
-    # LABELS = ['No Default', 'Default']
-    # tree_gs_perf = performance_evaluation_report(classifier_gs, X_test,
-    #                                              y_test, labels=LABELS,
-    #                                              show_plot=True)
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch8_im20.png')
-    # plt.show()
-    #
-    #
-    # # In[26]:
-    #
-    #
-    # tree_gs_perf
-    #
-    #
-    # # 8. Run Randomized Grid Search:
-    #
-    # # In[27]:
-    #
-    #
-    # classifier_rs = RandomizedSearchCV(tree_pipeline, param_grid, scoring='recall',
-    #                                    cv=k_fold, n_jobs=-1, verbose=1,
-    #                                    n_iter=100, random_state=42)
-    # classifier_rs.fit(X_train, y_train)
-    #
-    #
-    # # In[28]:
-    #
-    #
-    # print(f'Best parameters: {classifier_rs.best_params_}')
-    # print(f'Recall (Training set): {classifier_rs.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, classifier_rs.predict(X_test)):.4f}')
-    #
-    #
-    # # 9. Evaluate the performance of the Randomized Grid Search:
-    #
-    # # In[29]:
-    #
-    #
-    # tree_rs_perf = performance_evaluation_report(classifier_rs, X_test,
-    #                                              y_test, labels=LABELS,
-    #                                              show_plot=True)
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch8_im21.png')
-    # plt.show()
-    #
-    #
-    # # In[30]:
-    #
-    #
-    # tree_rs_perf
-    #
-    #
-    # # ### There's more
-    #
-    # # In[31]:
-    #
-    #
-    # from sklearn.linear_model import LogisticRegression
-    #
-    #
-    # # In[32]:
-    #
-    #
-    # param_grid = [{'classifier': [LogisticRegression()],
-    #                'classifier__penalty': ['l1', 'l2'],
-    #                'classifier__C': np.logspace(0, 3, 10, 2),
-    #                'preprocessor__numerical__outliers__n_std': [3, 4]},
-    #               {'classifier': [DecisionTreeClassifier(random_state=42)],
-    #                'classifier__criterion': ['entropy', 'gini'],
-    #                'classifier__max_depth': range(3, 11),
-    #                'classifier__min_samples_leaf': range(2, 11),
-    #                'preprocessor__numerical__outliers__n_std': [3, 4]}]
-    #
-    #
-    # # In[33]:
-    #
-    #
-    # classifier_gs_2 = GridSearchCV(tree_pipeline, param_grid, scoring='recall',
-    #                                cv=k_fold, n_jobs=-1, verbose=1)
-    #
+    ## Implementing scikit-learn's pipelines
+    df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
+    X = df.copy()
+    y = X.pop("default_payment_next_month")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+    num_features = X_train.select_dtypes(include="number").columns.to_list()
+    cat_features = X_train.select_dtypes(include="object").columns.to_list()
+
+    # 4. Define the numerical pipeline:
+    num_pipeline = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
+    cat_list = [list(X_train[col].dropna().unique()) for col in cat_features]
+    cat_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            (
+                "onehot",
+                OneHotEncoder(
+                    categories=cat_list, sparse=False, handle_unknown="error", drop="first"
+                ),
+            ),
+        ]
+    )
+    # 6. Define the column transformer object:
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("numerical", num_pipeline, num_features),
+            ("categorical", cat_pipeline, cat_features),
+        ],
+        remainder="drop",
+    )
+    # 7. Create the joint pipeline:
+    dec_tree = DecisionTreeClassifier(random_state=42)
+    tree_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", dec_tree)])
+    tree_pipeline.fit(X_train, y_train)
+    LABELS = ["No Default", "Default"]
+    tree_perf = performance_evaluation_report(
+        tree_pipeline, X_test, y_test, labels=LABELS, show_plot=True
+    )
+    ic(tree_perf)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im17.png")
+    plt.close()
+
+    class OutlierRemover(BaseEstimator, TransformerMixin):
+        def __init__(self, n_std=3):
+            self.n_std = n_std
+
+        def fit(self, X, y=None):
+            if np.isnan(X).any(axis=None):
+                raise ValueError(
+                    """There are missing values in the array!
+                                    Please remove them."""
+                )
+            mean_vec = np.mean(X, axis=0)
+            std_vec = np.std(X, axis=0)
+            self.lower_band_ = mean_vec - self.n_std * std_vec
+            self.upper_band_ = mean_vec + self.n_std * std_vec
+            self.n_features_ = len(self.upper_band_)
+            return self
+
+        def transform(self, X, y=None):
+            X_copy = pd.DataFrame(X.copy())
+            upper_band = np.repeat(
+                self.upper_band_.reshape(self.n_features_, -1), len(X_copy), axis=1
+            ).transpose()
+            lower_band = np.repeat(
+                self.lower_band_.reshape(self.n_features_, -1), len(X_copy), axis=1
+            ).transpose()
+            X_copy[X_copy >= upper_band] = upper_band
+            X_copy[X_copy <= lower_band] = lower_band
+            return X_copy.values
+
+    num_pipeline = Pipeline(
+        steps=[("imputer", SimpleImputer(strategy="median")), ("outliers", OutlierRemover())]
+    )
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("numerical", num_pipeline, num_features),
+            ("categorical", cat_pipeline, cat_features),
+        ],
+        remainder="drop",
+    )
+    dec_tree = DecisionTreeClassifier(random_state=42)
+    tree_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", dec_tree)])
+    tree_pipeline.fit(X_train, y_train)
+    tree_perf = performance_evaluation_report(
+        tree_pipeline, X_test, y_test, labels=LABELS, show_plot=True
+    )
+    ic(tree_perf)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im18.png")
+
+    ## Tuning hyperparameters using grid search and cross-validation
+    k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
+    cross_val_score(tree_pipeline, X_train, y_train, cv=k_fold)
+    cross_validate(
+        tree_pipeline,
+        X_train,
+        y_train,
+        cv=k_fold,
+        scoring=["accuracy", "precision", "recall", "roc_auc"],
+    )
+    param_grid = {
+        "classifier__criterion": ["entropy", "gini"],
+        "classifier__max_depth": range(3, 11),
+        "classifier__min_samples_leaf": range(2, 11),
+        "preprocessor__numerical__outliers__n_std": [3, 4],
+    }
+
+    classifier_gs = GridSearchCV(
+        tree_pipeline, param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+    )
+    classifier_gs.fit(X_train, y_train)
+
+    print(f"Best parameters: {classifier_gs.best_params_}")
+    print(f"Recall (Training set): {classifier_gs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs.predict(X_test)):.4f}")
+
+    LABELS = ["No Default", "Default"]
+    tree_gs_perf = performance_evaluation_report(
+        classifier_gs, X_test, y_test, labels=LABELS, show_plot=True
+    )
+    ic(tree_gs_perf)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im20.png")
+
+    classifier_rs = RandomizedSearchCV(
+        tree_pipeline,
+        param_grid,
+        scoring="recall",
+        cv=k_fold,
+        n_jobs=-1,
+        verbose=1,
+        n_iter=100,
+        random_state=42,
+    )
+    classifier_rs.fit(X_train, y_train)
+
+    print(f"Best parameters: {classifier_rs.best_params_}")
+    print(f"Recall (Training set): {classifier_rs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_rs.predict(X_test)):.4f}")
+
+    tree_rs_perf = performance_evaluation_report(
+        classifier_rs, X_test, y_test, labels=LABELS, show_plot=True
+    )
+    ic(tree_rs_perf)
+    plt.tight_layout()
+    plt.savefig("images/ch8_im21.png")
+
+    # param_grid = [
+    #     {
+    #         "classifier": [LogisticRegression()],
+    #         "classifier__penalty": ["l1", "l2"],
+    #         "classifier__C": np.logspace(0, 3, 10, 2),
+    #         "preprocessor__numerical__outliers__n_std": [3, 4],
+    #     },
+    #     {
+    #         "classifier": [DecisionTreeClassifier(random_state=42)],
+    #         "classifier__criterion": ["entropy", "gini"],
+    #         "classifier__max_depth": range(3, 11),
+    #         "classifier__min_samples_leaf": range(2, 11),
+    #         "preprocessor__numerical__outliers__n_std": [3, 4],
+    #     },
+    # ]
+    #
+    # classifier_gs_2 = GridSearchCV(
+    #     tree_pipeline, param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+    # )
     # classifier_gs_2.fit(X_train, y_train)
     #
-    # print(f'Best parameters: {classifier_gs_2.best_params_}')
-    # print(f'Recall (Training set): {classifier_gs_2.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}')
+    # print(f"Best parameters: {classifier_gs_2.best_params_}")
+    # print(f"Recall (Training set): {classifier_gs_2.best_score_:.4f}")
+    # print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}")
