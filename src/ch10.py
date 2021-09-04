@@ -7,16 +7,20 @@ import warnings
 import torch
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.functional as F
 import random
 import os
 
 from fastai import *
 from fastai.tabular import *
+from fastai.tabular.all import *
 from torch.utils.data import Dataset, TensorDataset, DataLoader, Subset
 from collections import OrderedDict
 from sklearn import metrics
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import StratifiedKFold
 from datetime import datetime
 from icecream import ic
 
@@ -144,562 +148,292 @@ def custom_set_seed(seed):
 
 if __name__ == "__main__":
     custom_set_seed(42)
+    # df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
+    # ic(df.head())
     #
-    #
-    # # 2. Load the dataset from a CSV file:
-    #
-    # # In[4]:
-    #
-    #
-    # df = pd.read_csv('../Datasets/credit_card_default.csv',
-    #                  index_col=0, na_values='')
-    # df.head()
-    #
-    #
-    # # 3. Identify the dependent variable (target) and numerical/categorical features:
-    #
-    # # In[5]:
-    #
-    #
-    # DEP_VAR = 'default_payment_next_month'
-    #
-    # num_features = list(df.select_dtypes('number').columns)
+    # DEP_VAR = "default_payment_next_month"
+    # num_features = list(df.select_dtypes("number").columns)
     # num_features.remove(DEP_VAR)
-    # cat_features = list(df.select_dtypes('object').columns)
-    #
+    # cat_features = list(df.select_dtypes("object").columns)
     # preprocessing = [FillMissing, Categorify, Normalize]
     #
-    #
-    # # 4. Create a `TabularDataBunch` from the DataFrame:
-    #
-    # # In[6]:
-    #
-    #
-    # data = (TabularList.from_df(df,
-    #                             cat_names=cat_features,
-    #                             cont_names=num_features,
-    #                             procs=preprocessing)
-    #                    .split_by_rand_pct(valid_pct=0.2, seed=42)
-    #                    .label_from_df(cols=DEP_VAR)
-    #                    .databunch())
-    #
-    #
+    # data = (
+    #     TabularList.from_df(
+    #         df, cat_names=cat_features, cont_names=num_features, procs=preprocessing
+    #     )
+    #     .split_by_rand_pct(valid_pct=0.2, seed=42)
+    #     .label_from_df(cols=DEP_VAR)
+    #     .databunch()
+    # )
     # # We additionally inspect a few rows from the DataBunch:
-    #
-    # # In[7]:
-    #
-    #
     # data.show_batch(rows=5)
     #
-    #
     # # 5. Define the `Learner` object:
-    #
-    # # In[8]:
-    #
-    #
-    # learn = tabular_learner(data, layers=[1000,500],
-    #                         ps=[0.001,0.01],
-    #                         emb_drop=0.04,
-    #                         metrics=[Recall(),
-    #                                  FBeta(beta=1),
-    #                                  FBeta(beta=5)])
-    #
-    #
+    # learn = tabular_learner(
+    #     data,
+    #     layers=[1000, 500],
+    #     ps=[0.001, 0.01],
+    #     emb_drop=0.04,
+    #     metrics=[Recall(), FBeta(beta=1), FBeta(beta=5)],
+    # )
     # # 6. Inspect the model's architecture:
-    #
-    # # In[9]:
-    #
-    #
-    # learn.model
-    #
+    # ic(learn.model)
     #
     # # `Embedding(11, 6)` means that a categorical embedding was created with 11 input values and 6 output latent features.
-    #
-    # # 7. Find the suggested learning rate:
-    #
-    # # In[10]:
-    #
-    #
     # learn.lr_find()
     # learn.recorder.plot(suggestion=True)
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im2.png')
-    # plt.show()
-    #
-    #
-    # # 8. Train the Neural Network:
-    #
-    # # In[11]:
-    #
+    # plt.tight_layout()
+    # plt.savefig("images/ch10_im2.png")
     #
     # learn.fit(epochs=25, lr=1e-6, wd=0.2)
-    #
-    #
-    # # 9. Plot the losses:
-    #
-    # # In[12]:
-    #
-    #
     # learn.recorder.plot_losses()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im4.png')
-    # plt.show()
-    #
-    #
-    # # 10. Extract the predictions for the validation set:
-    #
-    # # In[13]:
-    #
+    # plt.tight_layout()
+    # plt.savefig("images/ch10_im4.png")
     #
     # preds_valid, _ = learn.get_preds(ds_type=DatasetType.Valid)
     # pred_valid = preds_valid.argmax(dim=-1)
     #
-    #
     # # 11. Inspect the performance (confusion matrix) on the validation set:
-    #
-    # # In[14]:
-    #
-    #
     # interp = ClassificationInterpretation.from_learner(learn)
     # interp.plot_confusion_matrix()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im5.png')
-    # plt.show()
-    #
-    #
-    # # In[15]:
-    #
-    #
+    # plt.tight_layout()
+    # plt.savefig("images/ch10_im5.png")
     # interp.plot_tab_top_losses(5)
-    #
-    #
-    # # 12. Inspect the performance evaluation metrics:
-    #
-    # # In[16]:
-    #
-    #
     # performance_evaluation_report(learn)
-    #
-    #
-    # # ### There's more
-    #
-    # # In[ ]:
-    #
-    #
-    # from sklearn.model_selection import StratifiedKFold
     #
     # X = df.copy()
     # y = X.pop(DEP_VAR)
-    #
     # train_ind, test_ind = next(StratifiedKFold(n_splits=5).split(X, y))
-    #
-    # data = (TabularList.from_df(df,
-    #                             cat_names=cat_features,
-    #                             cont_names=num_features,
-    #                             procs=preprocessing)
-    #                    .split_by_idxs(train_idx=list(train_ind),
-    #                                   valid_idx=list(test_ind))
-    #                    .label_from_df(cols=DEP_VAR)
-    #                    .databunch())
-    #
-    #
-    # # ## Multilayer perceptrons for time series forecasting
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[2]:
-    #
-    #
-    # import yfinance as yf
-    # import numpy as np
-    #
-    # import torch
-    # import torch.optim as optim
-    # import torch.nn as nn
-    # import torch.nn.functional as F
-    # from torch.utils.data import (Dataset, TensorDataset,
-    #                               DataLoader, Subset)
-    #
-    # from sklearn.metrics import mean_squared_error
-    #
-    # print(torch.__version__)
-    #
-    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #
-    #
-    # # 2. Define parameters:
-    #
-    # # In[3]:
-    #
-    #
-    # # data
-    # TICKER = 'ANF'
-    # START_DATE = '2010-01-02'
-    # END_DATE = '2019-12-31'
-    # N_LAGS = 3
-    #
-    # # neural network
-    # VALID_SIZE = 12
-    # BATCH_SIZE = 5
-    # N_EPOCHS = 1000
-    #
-    #
-    # # 3. Download and prepare the data:
-    #
-    # # In[4]:
-    #
-    #
-    # df = yf.download(TICKER,
-    #                  start=START_DATE,
-    #                  end=END_DATE,
-    #                  progress=False)
-    #
-    # df = df.resample('M').last()
-    # prices = df['Adj Close'].values
-    #
-    #
-    # # In[6]:
-    #
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(df.index, prices)
-    # ax.set(title=f"{TICKER}'s Stock price",
-    #        xlabel='Time',
-    #        ylabel='Price ($)');
-    #
-    #
-    # # 4. Define a function for transforming time series into a dataset for the MLP:
-    #
-    # # In[7]:
-    #
-    #
-    # def create_input_data(series, n_lags=1):
-    #     '''
-    #     Function for transforming time series into input acceptable by a multilayer perceptron.
-    #
-    #     Parameters
-    #     ----------
-    #     series : np.array
-    #         The time series to be transformed
-    #     n_lags : int
-    #         The number of lagged observations to consider as features
-    #
-    #     Returns
-    #     -------
-    #     X : np.array
-    #         Array of features
-    #     y : np.array
-    #         Array of target
-    #     '''
-    #     X, y = [], []
-    #
-    #     for step in range(len(series) - n_lags):
-    #         end_step = step + n_lags
-    #         X.append(series[step:end_step])
-    #         y.append(series[end_step])
-    #     return np.array(X), np.array(y)
-    #
-    #
-    # # 5. Transform the considered time series into input for the MLP:
-    #
-    # # In[8]:
-    #
-    #
-    # X, y = create_input_data(prices, N_LAGS)
-    #
-    # X_tensor = torch.from_numpy(X).float()
-    # y_tensor = torch.from_numpy(y).float().unsqueeze(dim=1)
-    #
-    #
-    # # 6. Create training and validation sets:
-    #
-    # # In[9]:
-    #
-    #
-    # valid_ind = len(X) - VALID_SIZE
-    #
-    # dataset = TensorDataset(X_tensor, y_tensor)
-    #
-    # train_dataset = Subset(dataset, list(range(valid_ind)))
-    # valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
-    #
-    # train_loader = DataLoader(dataset=train_dataset,
-    #                           batch_size=BATCH_SIZE)
-    # valid_loader = DataLoader(dataset=valid_dataset,
-    #                           batch_size=BATCH_SIZE)
-    #
-    #
-    # # Inspect the observations from the first batch:
-    #
-    # # In[10]:
-    #
-    #
-    # next(iter(train_loader))[0]
-    #
-    #
-    # # In[11]:
-    #
-    #
-    # next(iter(train_loader))[1]
-    #
-    #
-    # # Check the size of the datasets:
-    #
-    # # In[12]:
-    #
-    #
-    # print(f'Size of datasets - training: {len(train_loader.dataset)} | validation: {len(valid_loader.dataset)}')
-    #
-    #
-    # # 7. Use naive forecast as a benchmark and evaluate the performance:
-    #
-    # # In[13]:
-    #
-    #
-    # naive_pred = prices[len(prices) - VALID_SIZE - 1:-1]
-    # y_valid = prices[len(prices) - VALID_SIZE:]
-    #
-    # naive_mse = mean_squared_error(y_valid, naive_pred)
-    # naive_rmse = np.sqrt(naive_mse)
-    # print(f"Naive forecast - MSE: {naive_mse:.2f}, RMSE: {naive_rmse:.2f}")
-    #
-    #
-    # # In[14]:
-    #
-    #
-    # # BONUS: Testing Linear Regression
-    #
-    # # from sklearn.linear_model import LinearRegression
-    #
-    # # X_train = X[:valid_ind, ]
-    # # y_train = y[:valid_ind]
-    #
-    # # X_valid = X[valid_ind:, ]
-    # # y_valid = y[valid_ind:]
-    #
-    # # lin_reg = LinearRegression()
-    # # lin_reg.fit(X_train, y_train)
-    #
-    # # y_pred = lin_reg.predict(X_valid)
-    # # lr_mse = mean_squared_error(y_valid, y_pred)
-    # # lr_rmse = np.sqrt(lr_mse)
-    # # print(f"Linear Regression's forecast - MSE: {lr_mse:.2f}, RMSE: {lr_rmse:.2f}")
-    # # print(f"Linear Regression's coefficients: {lin_reg.coef_}")
-    #
-    # # fig, ax = plt.subplots()
-    #
-    # # ax.plot(y_valid, color='blue', label='Actual')
-    # # ax.plot(y_pred, color='red', label='Prediction')
-    #
-    # # ax.set(title="Linear Regression's Forecasts",
-    # #        xlabel='Time',
-    # #        ylabel='Price ($)')
-    # # ax.legend();
-    #
-    #
-    # # 8. Define the network's architecture:
-    #
-    # # In[15]:
-    #
-    #
-    # class MLP(nn.Module):
-    #
-    #     def __init__(self, input_size):
-    #         super(MLP, self).__init__()
-    #         self.linear1 = nn.Linear(input_size, 8)
-    #         self.linear2 = nn.Linear(8, 4)
-    #         self.linear3 = nn.Linear(4, 1)
-    #         self.dropout = nn.Dropout(p=0.2)
-    #
-    #     def forward(self, x):
-    #         x = self.linear1(x)
-    #         x = F.relu(x)
-    #         x = self.dropout(x)
-    #         x = self.linear2(x)
-    #         x = F.relu(x)
-    #         x = self.dropout(x)
-    #         x = self.linear3(x)
-    #         return x
-    #
-    #
-    # # 9. Instantiate the model, the loss function and the optimizer:
-    #
-    # # In[16]:
-    #
-    #
-    # # set seed for reproducibility
-    # torch.manual_seed(42)
-    #
-    # model = MLP(N_LAGS).to(device)
-    # loss_fn = nn.MSELoss()
-    # optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #
-    #
-    # # In[17]:
-    #
-    #
-    # model
-    #
-    #
-    # # 10. Train the network:
-    #
-    # # In[18]:
-    #
-    #
-    # PRINT_EVERY = 50
-    # train_losses, valid_losses = [], []
-    #
-    # for epoch in range(N_EPOCHS):
-    #     running_loss_train = 0
-    #     running_loss_valid = 0
-    #
-    #     model.train()
-    #
-    #     for x_batch, y_batch in train_loader:
-    #
-    #         optimizer.zero_grad()
-    #
-    #         x_batch = x_batch.to(device)
-    #         y_batch = y_batch.to(device)
-    #         y_hat = model(x_batch)
-    #         loss = loss_fn(y_batch, y_hat)
-    #         loss.backward()
-    #         optimizer.step()
-    #         running_loss_train += loss.item() * x_batch.size(0)
-    #
-    #     epoch_loss_train = running_loss_train / len(train_loader.dataset)
-    #     train_losses.append(epoch_loss_train)
-    #
-    #     with torch.no_grad():
-    #
-    #         model.eval()
-    #
-    #         for x_val, y_val in valid_loader:
-    #             x_val = x_val.to(device)
-    #             y_val = y_val.to(device)
-    #             y_hat = model(x_val)
-    #             loss = loss_fn(y_val, y_hat)
-    #             running_loss_valid += loss.item() * x_val.size(0)
-    #
-    #         epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
-    #
-    #         if epoch > 0 and epoch_loss_valid < min(valid_losses):
-    #             best_epoch = epoch
-    #             torch.save(model.state_dict(), './mlp_checkpoint.pth')
-    #
-    #         valid_losses.append(epoch_loss_valid)
-    #
-    #     if epoch % PRINT_EVERY == 0:
-    #         print(f"<{epoch}> - Train. loss: {epoch_loss_train:.2f} \t Valid. loss: {epoch_loss_valid:.2f}")
-    #
-    # print(f'Lowest loss recorded in epoch: {best_epoch}')
-    #
-    #
-    # # 11. Plot the losses over epochs:
-    #
-    # # In[20]:
-    #
-    #
-    # train_losses = np.array(train_losses)
-    # valid_losses = np.array(valid_losses)
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(train_losses, color='blue', label='Training loss')
-    # ax.plot(valid_losses, color='red', label='Validation loss')
-    #
-    # ax.set(title='Loss over epochs',
-    #        xlabel='Epoch',
-    #        ylabel='Loss')
-    # ax.legend()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im7.png')
-    # plt.show()
-    #
-    #
-    # # 12. Load the best model (with the lowest validation loss):
-    #
-    # # In[21]:
-    #
-    #
-    # state_dict = torch.load('mlp_checkpoint.pth')
-    # model.load_state_dict(state_dict)
-    #
-    #
-    # # 13. Obtain the predictions:
-    #
-    # # In[22]:
-    #
-    #
-    # y_pred, y_valid= [], []
-    #
-    # with torch.no_grad():
-    #
-    #     model.eval()
-    #
-    #     for x_val, y_val in valid_loader:
-    #         x_val = x_val.to(device)
-    #         y_pred.append(model(x_val))
-    #         y_valid.append(y_val)
-    #
-    # y_pred = torch.cat(y_pred).numpy().flatten()
-    # y_valid = torch.cat(y_valid).numpy().flatten()
-    #
-    #
-    # # 14. Evaluate the predictions:
-    #
-    # # In[23]:
-    #
-    #
-    # mlp_mse = mean_squared_error(y_valid, y_pred)
-    # mlp_rmse = np.sqrt(mlp_mse)
-    # print(f"MLP's forecast - MSE: {mlp_mse:.2f}, RMSE: {mlp_rmse:.2f}")
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(y_valid, color='blue', label= 'True')
-    # ax.plot(y_pred, color='red', label='Prediction')
-    #
-    # ax.set(title="Multilayer Perceptron's Forecasts",
-    #        xlabel='Time',
-    #        ylabel='Price ($)')
-    # ax.legend()
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch10_im8.png')
-    # plt.show()
-    #
-    #
-    # # ### There's more
-    #
-    # # #### A sequential approach to defining the network's architecture
-    #
-    # # Below we define the same network as we have already used before in this recipe:
-    #
-    # # In[24]:
-    #
-    #
-    # model = nn.Sequential(
-    #     nn.Linear(3, 8),
-    #     nn.ReLU(),
-    #     nn.Dropout(0.2),
-    #     nn.Linear(8, 4),
-    #     nn.ReLU(),
-    #     nn.Dropout(0.2),
-    #     nn.Linear(4, 1)
+    # data = (
+    #     TabularList.from_df(
+    #         df, cat_names=cat_features, cont_names=num_features, procs=preprocessing
+    #     )
+    #     .split_by_idxs(train_idx=list(train_ind), valid_idx=list(test_ind))
+    #     .label_from_df(cols=DEP_VAR)
+    #     .databunch()
     # )
-    #
-    # model
-    #
-    #
-    # # #### Estimating neural networks using `scikit-learn`
+
+    ## Multilayer perceptrons for time series forecasting
+    print(torch.__version__)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    TICKER = "ANF"
+    START_DATE = "2010-01-02"
+    END_DATE = "2019-12-31"
+    N_LAGS = 3
+
+    # neural network
+    VALID_SIZE = 12
+    BATCH_SIZE = 16
+    N_EPOCHS = 1000
+
+    df = yf.download(TICKER, start=START_DATE, end=END_DATE, progress=False)
+    df = df.resample("M").last()
+    prices = df["Adj Close"].values
+
+    fig, ax = plt.subplots()
+    ax.plot(df.index, prices)
+    ax.set(title=f"{TICKER}'s Stock price", xlabel="Time", ylabel="Price ($)")
+    plt.tight_layout()
+    plt.savefig("images/ch10_im6.png")
+
+    def create_input_data(series, n_lags=1):
+        """
+        Function for transforming time series into input acceptable by a multilayer perceptron.
+        Parameters
+        ----------
+        series : np.array
+            The time series to be transformed
+        n_lags : int
+            The number of lagged observations to consider as features
+        Returns
+        -------
+        X : np.array
+            Array of features
+        y : np.array
+            Array of target
+        """
+        X, y = [], []
+        for step in range(len(series) - n_lags):
+            end_step = step + n_lags
+            X.append(series[step:end_step])
+            y.append(series[end_step])
+        return np.array(X), np.array(y)
+
+    # 5. Transform the considered time series into input for the MLP:
+    X, y = create_input_data(prices, N_LAGS)
+
+    X_tensor = torch.from_numpy(X).float()
+    y_tensor = torch.from_numpy(y).float().unsqueeze(dim=1)
+
+    # 6. Create training and validation sets:
+    valid_ind = len(X) - VALID_SIZE
+    dataset = TensorDataset(X_tensor, y_tensor)
+    train_dataset = Subset(dataset, list(range(valid_ind)))
+    valid_dataset = Subset(dataset, list(range(valid_ind, len(X))))
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE)
+    valid_loader = DataLoader(dataset=valid_dataset, batch_size=BATCH_SIZE)
+
+    # Inspect the observations from the first batch:
+    ic(next(iter(train_loader))[0])
+    ic(next(iter(train_loader))[1])
+
+    # Check the size of the datasets:
+    print(
+        f"Size of datasets - training: {len(train_loader.dataset)} | validation: {len(valid_loader.dataset)}"
+    )
+
+    # 7. Use naive forecast as a benchmark and evaluate the performance:
+    naive_pred = prices[len(prices) - VALID_SIZE - 1 : -1]
+    y_valid = prices[len(prices) - VALID_SIZE :]
+
+    naive_mse = mean_squared_error(y_valid, naive_pred)
+    naive_rmse = np.sqrt(naive_mse)
+    print(f"Naive forecast - MSE: {naive_mse:.2f}, RMSE: {naive_rmse:.2f}")
+
+    # BONUS: Testing Linear Regression
+    X_train = X[
+        :valid_ind,
+    ]
+    y_train = y[:valid_ind]
+    X_valid = X[
+        valid_ind:,
+    ]
+    y_valid = y[valid_ind:]
+
+    lin_reg = LinearRegression()
+    lin_reg.fit(X_train, y_train)
+    y_pred = lin_reg.predict(X_valid)
+    lr_mse = mean_squared_error(y_valid, y_pred)
+    lr_rmse = np.sqrt(lr_mse)
+    print(f"Linear Regression's forecast - MSE: {lr_mse:.2f}, RMSE: {lr_rmse:.2f}")
+    print(f"Linear Regression's coefficients: {lin_reg.coef_}")
+
+    fig, ax = plt.subplots()
+    ax.plot(y_valid, color="blue", label="Actual")
+    ax.plot(y_pred, color="red", label="Prediction")
+    ax.set(title="Linear Regression's Forecasts", xlabel="Time", ylabel="Price ($)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im6_1.png")
+
+    class MLP(nn.Module):
+        def __init__(self, input_size):
+            super(MLP, self).__init__()
+            self.linear1 = nn.Linear(input_size, 8)
+            self.linear2 = nn.Linear(8, 4)
+            self.linear3 = nn.Linear(4, 1)
+            self.dropout = nn.Dropout(p=0.2)
+
+        def forward(self, x):
+            x = self.linear1(x)
+            x = F.relu(x)
+            x = self.dropout(x)
+            x = self.linear2(x)
+            x = F.relu(x)
+            x = self.dropout(x)
+            x = self.linear3(x)
+            return x
+
+    torch.manual_seed(42)
+    model = MLP(N_LAGS).to(device)
+    loss_fn = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    ic(model)
+
+    PRINT_EVERY = 50
+    train_losses, valid_losses = [], []
+    for epoch in range(N_EPOCHS):
+        running_loss_train = 0
+        running_loss_valid = 0
+        model.train()
+        for x_batch, y_batch in train_loader:
+            optimizer.zero_grad()
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            y_hat = model(x_batch)
+            loss = loss_fn(y_batch, y_hat)
+            loss.backward()
+            optimizer.step()
+            running_loss_train += loss.item() * x_batch.size(0)
+        epoch_loss_train = running_loss_train / len(train_loader.dataset)
+        train_losses.append(epoch_loss_train)
+        with torch.no_grad():
+            model.eval()
+            for x_val, y_val in valid_loader:
+                x_val = x_val.to(device)
+                y_val = y_val.to(device)
+                y_hat = model(x_val)
+                loss = loss_fn(y_val, y_hat)
+                running_loss_valid += loss.item() * x_val.size(0)
+
+            epoch_loss_valid = running_loss_valid / len(valid_loader.dataset)
+
+            if epoch > 0 and epoch_loss_valid < min(valid_losses):
+                best_epoch = epoch
+                torch.save(model.state_dict(), "data/mlp_checkpoint.pth")
+
+            valid_losses.append(epoch_loss_valid)
+
+        if epoch % PRINT_EVERY == 0:
+            print(
+                f"<{epoch}> - Train. loss: {epoch_loss_train:.2f} \t Valid. loss: {epoch_loss_valid:.2f}"
+            )
+    print(f"Lowest loss recorded in epoch: {best_epoch}")
+
+    train_losses = np.array(train_losses)
+    valid_losses = np.array(valid_losses)
+
+    fig, ax = plt.subplots()
+    ax.plot(train_losses, color="blue", label="Training loss")
+    ax.plot(valid_losses, color="red", label="Validation loss")
+    ax.set(title="Loss over epochs", xlabel="Epoch", ylabel="Loss")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im7.png")
+
+    # 12. Load the best model (with the lowest validation loss):
+    state_dict = torch.load("data/mlp_checkpoint.pth")
+    model.load_state_dict(state_dict)
+    # 13. Obtain the predictions:
+    y_pred, y_valid = [], []
+    with torch.no_grad():
+        model.eval()
+        for x_val, y_val in valid_loader:
+            x_val = x_val.to(device)
+            y_pred.append(model(x_val))
+            y_valid.append(y_val)
+    y_pred = torch.cat(y_pred).cpu().numpy().flatten()
+    y_valid = torch.cat(y_valid).cpu().numpy().flatten()
+
+    # 14. Evaluate the predictions:
+    mlp_mse = mean_squared_error(y_valid, y_pred)
+    mlp_rmse = np.sqrt(mlp_mse)
+    print(f"MLP's forecast - MSE: {mlp_mse:.2f}, RMSE: {mlp_rmse:.2f}")
+
+    fig, ax = plt.subplots()
+    ax.plot(y_valid, color="blue", label="True")
+    ax.plot(y_pred, color="red", label="Prediction")
+    ax.set(title="Multilayer Perceptron's Forecasts", xlabel="Time", ylabel="Price ($)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("images/ch10_im8.png")
+
+    #### A sequential approach to defining the network's architecture
+    # Below we define the same network as we have already used before in this recipe:
+    model = nn.Sequential(
+        nn.Linear(3, 8),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(8, 4),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(4, 1),
+    )
+    ic(model)
+
+    #### Estimating neural networks using `scikit-learn`
     #
     # # 1. Import the libraries:
     #
@@ -1024,17 +758,8 @@ if __name__ == "__main__":
     END_DATE = datetime(2019, 12, 31)
     VALID_START = datetime(2019, 7, 1)
     N_LAGS = 12
-    # import torch
-    # import torch.optim as optim
-    # import torch.nn as nn
-    # from torch.utils.data import Dataset, TensorDataset, DataLoader, Subset
-    # from collections import OrderedDict
-    # from chapter_10_utils import create_input_data, custom_set_seed
-    #
-    # from sklearn.metrics import mean_squared_error
-    #
 
-    BATCH_SIZE = 5
+    BATCH_SIZE = 256
     N_EPOCHS = 2000
 
     src_data = "data/yf_intl.pkl"
@@ -1171,8 +896,8 @@ if __name__ == "__main__":
             x_val = x_val.view(x_val.shape[0], 1, N_LAGS)
             y_pred.append(model(x_val))
             y_valid.append(y_val)
-    y_pred = torch.cat(y_pred).numpy().flatten()
-    y_valid = torch.cat(y_valid).numpy().flatten()
+    y_pred = torch.cat(y_pred).cpu().numpy().flatten()
+    y_valid = torch.cat(y_valid).cpu().numpy().flatten()
 
     # 13. Evaluate the predictions:
     cnn_mse = mean_squared_error(y_valid, y_pred)
@@ -1189,7 +914,7 @@ if __name__ == "__main__":
     plt.savefig("images/ch10_im12.png")
 
     ## Recurrent neural networks for time series forecasting
-    BATCH_SIZE = 16
+    BATCH_SIZE = 32
     N_EPOCHS = 100
 
     # 4. Scale the time series of prices:
