@@ -17,7 +17,7 @@ from icecream import ic
 
 plt.style.use("seaborn")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)

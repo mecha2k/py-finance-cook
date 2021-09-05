@@ -25,8 +25,12 @@ from icecream import ic
 
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
+plt.set_cmap("cubehelix")
+sns.set_palette("cubehelix")
 warnings.simplefilter(action="ignore", category=FutureWarning)
+
+COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
@@ -124,6 +128,39 @@ def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
     return fig
 
 
+def decompose_time_series():
+    src_data = "data/qd_gold.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        gold = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        gold = quandl.get(dataset="WGC/GOLD_MONAVG_USD", start_date=start, end_date=end)
+        gold.to_pickle(src_data)
+
+    df = gold.copy()["2000-1":"2011-12"]
+    ic(df.head())
+    df.rename(columns={"Value": "price"}, inplace=True)
+    df = df.resample("M").last()
+    ic(f"Shape of DataFrame: {df.shape}")
+    ic(df.head())
+
+    WINDOW_SIZE = 12
+    df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
+    df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
+    df.plot(title="Gold Price")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im1.png", format="png", dpi=300)
+
+    # 4. Carry out seasonal decomposition using the multiplicative model:
+    decomposition_results = seasonal_decompose(df.price, model="multiplicative")
+    decomposition_results.plot().suptitle("Multiplicative Decomposition", fontsize=14)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im2.png")
+    plt.close()
+
+
 def decompose_with_prophet():
     src_data = "data/qd_gold_day.pkl"
     try:
@@ -181,6 +218,16 @@ def decompose_with_prophet():
 
 
 def testing_stationary():
+    src_data = "data/qd_gold.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        gold = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        gold = quandl.get(dataset="WGC/GOLD_MONAVG_USD", start_date=start, end_date=end)
+        gold.to_pickle(src_data)
+
     df = gold.copy()["2000-1-1":"2011-12-31"]
     df.rename(columns={"Value": "price"}, inplace=True)
     df = df.resample("M").last()
@@ -258,6 +305,117 @@ def testing_stationary():
     ic(f"Suggested # of differences (PP): {ndiffs(df.price, test='pp')}")
     ic(f"Suggested # of differences (OSCB): {nsdiffs(df.price, m=12, test='ocsb')}")
     ic(f"Suggested # of differences (CH): {nsdiffs(df.price, m=12, test='ch')}")
+
+
+def exponential_smoothing():
+    src_data = "data/yf_google.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        goog = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        goog = yf.download("GOOG", start=start, end=end, adjusted=True)
+        goog.to_pickle(src_data)
+    df = goog.copy()["2010-1":"2018-12"]
+    ic(f"Downloaded {df.shape[0]} rows of data.")
+    goog = df.resample("M").last().rename(columns={"Adj Close": "adj_close"}).adj_close
+
+    train_indices = goog.index.year < 2018
+    goog_train = goog[train_indices]
+    goog_test = goog[~train_indices]
+    test_length = len(goog_test)
+
+    plt.clf()
+    goog.plot(title="Google's Stock Price")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im14.png")
+
+    # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
+    ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=0.2
+    )
+    ses_forecast_1 = ses_1.forecast(steps=test_length)
+    ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=0.5
+    )
+    ses_forecast_2 = ses_2.forecast(steps=test_length)
+    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
+        smoothing_level=None
+    )
+    alpha = ses_3.model.params["smoothing_level"]
+    ses_forecast_3 = ses_3.forecast(steps=test_length)
+
+    # 7. Plot the original prices together with the models' results:
+    plt.clf()
+    goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
+    ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
+    ses_1.fittedvalues.plot(color=COLORS[1])
+    ses_forecast_2.plot(color=COLORS[2], legend=True, label=r"$\alpha=0.5$")
+    ses_2.fittedvalues.plot(color=COLORS[2])
+    ses_forecast_3.plot(color=COLORS[3], legend=True, label=r"$\alpha={0:.4f}$".format(alpha))
+    ses_3.fittedvalues.plot(color=COLORS[3])
+    plt.tight_layout()
+    plt.savefig("images/ch3_im15.png")
+    plt.close()
+
+    # Holt's model with linear trend
+    hs_1 = Holt(goog_train).fit()
+    hs_forecast_1 = hs_1.forecast(test_length)
+    # Holt's model with exponential trend
+    hs_2 = Holt(goog_train, exponential=True, damped=False).fit()
+    # equivalent to ExponentialSmoothing(goog_train, trend='mul').fit()
+    hs_forecast_2 = hs_2.forecast(test_length)
+    # Holt's model with exponential trend and damping
+    hs_3 = Holt(goog_train, exponential=True, damped=True).fit(damping_slope=0.99)
+    hs_forecast_3 = hs_3.forecast(test_length)
+
+    # 9. Plot the original prices together with the models' results:
+    plt.clf()
+    goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
+    hs_1.fittedvalues.plot(color=COLORS[1])
+    hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
+    hs_2.fittedvalues.plot(color=COLORS[2])
+    hs_forecast_2.plot(color=COLORS[2], legend=True, label="Exponential trend")
+    hs_3.fittedvalues.plot(color=COLORS[3])
+    hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
+    plt.tight_layout()
+    plt.savefig("images/ch3_im16.png")
+
+    SEASONAL_PERIODS = 12
+    # Holt-Winter's model with exponential trend
+    hw_1 = ExponentialSmoothing(
+        goog_train,
+        trend="mul",
+        seasonal="add",
+        seasonal_periods=SEASONAL_PERIODS,
+        damped=False,
+        initialization_method="estimated",
+    ).fit()
+    hw_forecast_1 = hw_1.forecast(test_length)
+    # Holt-Winter's model with exponential trend and damping
+    hw_2 = ExponentialSmoothing(
+        goog_train,
+        trend="mul",
+        seasonal="add",
+        seasonal_periods=SEASONAL_PERIODS,
+        damped=True,
+        initialization_method="estimated",
+    ).fit()
+    hw_forecast_2 = hw_2.forecast(test_length)
+
+    plt.clf()
+    goog.plot(
+        color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
+    )
+    hw_1.fittedvalues.plot(color=COLORS[1])
+    hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
+    phi = hw_2.model.params["damping_trend"]
+    plot_label = f"Seasonal Smoothing (damped with $\phi={phi:.4f}$)"
+    hw_2.fittedvalues.plot(color=COLORS[2])
+    hw_forecast_2.plot(color=COLORS[2], legend=True, label=plot_label)
+    plt.tight_layout()
+    plt.savefig("images/ch3_im17.png")
 
 
 def arima_models():
@@ -401,156 +559,18 @@ def arima_models():
     plt.close()
 
 
-def exponential_smoothing():
-    plt.set_cmap("cubehelix")
-    sns.set_palette("cubehelix")
-    COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
-
-    src_data = "data/yf_google.pkl"
-    start = datetime(2000, 1, 1)
-    end = datetime(2020, 12, 31)
-    try:
-        goog = pd.read_pickle(src_data)
-        print("data reading from file...")
-    except FileNotFoundError:
-        goog = yf.download("GOOG", start=start, end=end, adjusted=True)
-        goog.to_pickle(src_data)
-    df = goog.copy()["2010-1":"2018-12"]
-    ic(f"Downloaded {df.shape[0]} rows of data.")
-    goog = df.resample("M").last().rename(columns={"Adj Close": "adj_close"}).adj_close
-
-    train_indices = goog.index.year < 2018
-    goog_train = goog[train_indices]
-    goog_test = goog[~train_indices]
-    test_length = len(goog_test)
-
-    plt.clf()
-    goog.plot(title="Google's Stock Price")
-    plt.tight_layout()
-    plt.savefig("images/ch3_im14.png")
-
-    # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
-    ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=0.2
-    )
-    ses_forecast_1 = ses_1.forecast(steps=test_length)
-    ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=0.5
-    )
-    ses_forecast_2 = ses_2.forecast(steps=test_length)
-    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=None
-    )
-    alpha = ses_3.model.params["smoothing_level"]
-    ses_forecast_3 = ses_3.forecast(steps=test_length)
-
-    # 7. Plot the original prices together with the models' results:
-    plt.clf()
-    goog.plot(color=COLORS[0], title="Simple Exponential Smoothing", label="Actual", legend=True)
-    ses_forecast_1.plot(color=COLORS[1], legend=True, label=r"$\alpha=0.2$")
-    ses_1.fittedvalues.plot(color=COLORS[1])
-    ses_forecast_2.plot(color=COLORS[2], legend=True, label=r"$\alpha=0.5$")
-    ses_2.fittedvalues.plot(color=COLORS[2])
-    ses_forecast_3.plot(color=COLORS[3], legend=True, label=r"$\alpha={0:.4f}$".format(alpha))
-    ses_3.fittedvalues.plot(color=COLORS[3])
-    plt.tight_layout()
-    plt.savefig("images/ch3_im15.png")
-    plt.close()
-
-    # Holt's model with linear trend
-    hs_1 = Holt(goog_train).fit()
-    hs_forecast_1 = hs_1.forecast(test_length)
-    # # Holt's model with exponential trend
-    # hs_2 = Holt(goog_train, exponential=True).fit()
-    # # equivalent to ExponentialSmoothing(goog_train, trend='mul').fit()
-    # hs_forecast_2 = hs_2.forecast(test_length)
-    # # Holt's model with exponential trend and damping
-    # hs_3 = Holt(goog_train, exponential=False, damped=True).fit(damping_slope=0.99)
-    # hs_forecast_3 = hs_3.forecast(test_length)
-    #
-    # # 9. Plot the original prices together with the models' results:
-    # plt.clf()
-    # goog.plot(color=COLORS[0], title="Holt's Smoothing models", label="Actual", legend=True)
-    # hs_1.fittedvalues.plot(color=COLORS[1])
-    # hs_forecast_1.plot(color=COLORS[1], legend=True, label="Linear trend")
-    # hs_2.fittedvalues.plot(color=COLORS[2])
-    # hs_forecast_2.plot(color=COLORS[2], legend=True, label="Exponential trend")
-    # hs_3.fittedvalues.plot(color=COLORS[3])
-    # hs_forecast_3.plot(color=COLORS[3], legend=True, label="Exponential trend (damped)")
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im16.png")
-
-    SEASONAL_PERIODS = 12
-    # Holt-Winter's model with exponential trend
-    hw_1 = ExponentialSmoothing(
-        goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS
-    ).fit()
-    hw_forecast_1 = hw_1.forecast(test_length)
-    # # Holt-Winter's model with exponential trend and damping
-    # hw_2 = ExponentialSmoothing(
-    #     goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS, damped=True
-    # ).fit()
-    # hw_forecast_2 = hw_2.forecast(test_length)
-    #
-    # plt.clf()
-    # goog.plot(
-    #     color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
-    # )
-    # hw_1.fittedvalues.plot(color=COLORS[1])
-    # hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
-    # phi = hw_2.model.params["damping_trend"]
-    # plot_label = f"Seasonal Smoothing (damped with $\phi={phi:.4f}$)"
-    # hw_2.fittedvalues.plot(color=COLORS[2])
-    # hw_forecast_2.plot(color=COLORS[2], legend=True, label=plot_label)
-    # plt.tight_layout()
-    # plt.savefig("images/ch3_im17.png")
-
-
-def decompose_time_series():
-    src_data = "data/qd_gold.pkl"
-    start = datetime(2000, 1, 1)
-    end = datetime(2020, 12, 31)
-    try:
-        gold = pd.read_pickle(src_data)
-        print("data reading from file...")
-    except FileNotFoundError:
-        gold = quandl.get(dataset="WGC/GOLD_MONAVG_USD", start_date=start, end_date=end)
-        gold.to_pickle(src_data)
-
-    df = gold.copy()["2000-1":"2011-12"]
-    ic(df.head())
-    df.rename(columns={"Value": "price"}, inplace=True)
-    df = df.resample("M").last()
-    ic(f"Shape of DataFrame: {df.shape}")
-    ic(df.head())
-
-    WINDOW_SIZE = 12
-    df["rolling_mean"] = df.price.rolling(window=WINDOW_SIZE).mean()
-    df["rolling_std"] = df.price.rolling(window=WINDOW_SIZE).std()
-    df.plot(title="Gold Price")
-    plt.tight_layout()
-    plt.savefig("images/ch3_im1.png", format="png", dpi=300)
-
-    # 4. Carry out seasonal decomposition using the multiplicative model:
-    decomposition_results = seasonal_decompose(df.price, model="multiplicative")
-    decomposition_results.plot().suptitle("Multiplicative Decomposition", fontsize=14)
-    plt.tight_layout()
-    plt.savefig("images/ch3_im2.png")
-    plt.close()
-
-
 if __name__ == "__main__":
-    # ## Decomposing time series
-    # decompose_time_series()
-    #
-    # ## Decomposing time series using Facebook's Prophet
-    # decompose_with_prophet()
+    ## Decomposing time series
+    decompose_time_series()
 
-    # ## Testing for stationarity in time series
-    # testing_stationary()
+    ## Decomposing time series using Facebook's Prophet
+    decompose_with_prophet()
+
+    ## Testing for stationarity in time series
+    testing_stationary()
 
     ## Modeling time series with exponential smoothing methods
     exponential_smoothing()
 
     ## Modeling time series with ARIMA class models
-    # arima_models()
+    arima_models()

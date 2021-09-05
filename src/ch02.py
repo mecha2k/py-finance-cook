@@ -12,7 +12,7 @@ from plotly.offline import iplot, init_notebook_mode
 # plt.style.use("default")
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
 # warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
