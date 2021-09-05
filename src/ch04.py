@@ -51,11 +51,16 @@ if __name__ == "__main__":
     covariance = X.cov().iloc[0, 1]
     benchmark_variance = X.market.var()
     beta = covariance / benchmark_variance
+    ic(X.cov())
+    ic(X.corr())
+    ic(X.market.var())
     ic(beta)
+    ic(covariance / np.sqrt(benchmark_variance) / np.sqrt(X.asset.var()))
     # 6. Prepare the input and estimate CAPM as a linear regression:
     y = X.pop("asset")
     X = sm.add_constant(X)
     capm_model = sm.OLS(y, X).fit()
+    ic(X.head())
     ic(capm_model.summary())
 
     #### Risk-free rate (13 Week Treasury Bill)
