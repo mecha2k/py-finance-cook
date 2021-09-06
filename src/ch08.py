@@ -421,7 +421,7 @@ if __name__ == "__main__":
     X_valid, X_test, y_valid, y_test = train_test_split(
         X_temp, y_temp, test_size=NEW_TEST_SIZE, stratify=y_temp, random_state=42
     )
-
+    #
     ## Dealing with missing values
     X.info()
     missingno.matrix(X)
@@ -430,6 +430,9 @@ if __name__ == "__main__":
     # 4. Define columns with missing values per data type:
     NUM_FEATURES = ["age"]
     CAT_FEATURES = ["sex", "education", "marriage"]
+
+    X_train = X_train.copy()
+    X_test = X_test.copy()
 
     # 5. Impute the numerical feature:
     for col in NUM_FEATURES:
@@ -656,7 +659,7 @@ if __name__ == "__main__":
     plt.savefig("images/ch8_im18.png")
 
     ## Tuning hyperparameters using grid search and cross-validation
-    k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
+    k_fold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
     cross_val_score(tree_pipeline, X_train, y_train, cv=k_fold)
     cross_validate(
         tree_pipeline,
@@ -673,7 +676,7 @@ if __name__ == "__main__":
     }
 
     classifier_gs = GridSearchCV(
-        tree_pipeline, param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+        tree_pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
     )
     classifier_gs.fit(X_train, y_train)
 
@@ -729,7 +732,7 @@ if __name__ == "__main__":
     # ]
     #
     # classifier_gs_2 = GridSearchCV(
-    #     tree_pipeline, param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+    #     tree_pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
     # )
     # classifier_gs_2.fit(X_train, y_train)
     #
