@@ -611,6 +611,9 @@ if __name__ == "__main__":
     class OutlierRemover(BaseEstimator, TransformerMixin):
         def __init__(self, n_std=3):
             self.n_std = n_std
+            self.lower_band_ = 0
+            self.upper_band_ = 0
+            self.n_features_ = 0
 
         def fit(self, X, y=None):
             if np.isnan(X).any(axis=None):
