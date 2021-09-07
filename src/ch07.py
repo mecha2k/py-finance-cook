@@ -22,7 +22,7 @@ from icecream import ic
 plt.style.use("seaborn")
 sns.set_palette("cubehelix")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)
@@ -316,7 +316,11 @@ if __name__ == "__main__":
     cov_mat = cov_mat.values
     weights = cp.Variable(n_assets)
     gamma = cp.Parameter(nonneg=True)
-    portf_rtn_cvx = avg_returns * weights
+    portf_rtn_cvx = avg_returns @ weights
+    # portf_rtn_cvx = cp.multiply(avg_returns, weights)
+    ic(avg_returns)
+    ic(weights)
+    ic(portf_rtn_cvx)
     portf_vol_cvx = cp.quad_form(weights, cov_mat)
     objective_function = cp.Maximize(portf_rtn_cvx - gamma * portf_vol_cvx)
     problem = cp.Problem(objective_function, [cp.sum(weights) == 1, weights >= 0])

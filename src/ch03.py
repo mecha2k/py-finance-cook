@@ -25,13 +25,110 @@ from icecream import ic
 
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
+plt.set_cmap("cubehelix")
+sns.set_palette("cubehelix")
 warnings.simplefilter(action="ignore", category=FutureWarning)
+
+COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
-if __name__ == "__main__":
+
+def adf_test(x):
+    """
+    Function for performing the Augmented Dickey-Fuller test for stationarity
+    Null Hypothesis: time series is not stationary
+    Alternate Hypothesis: time series is stationary
+    Parameters
+    ----------
+    x : pd.Series / np.array
+        The time series to be checked for stationarity
+    Returns
+    -------
+    results: pd.DataFrame
+        A DataFrame with the ADF test's results
+    """
+
+    indices = ["Test Statistic", "p-value", "# of Lags Used", "# of Observations Used"]
+    adf_test = adfuller(x, autolag="AIC")
+    results = pd.Series(adf_test[0:4], index=indices)
+    for key, value in adf_test[4].items():
+        results[f"Critical Value ({key})"] = value
+    return results
+
+
+def kpss_test(x, h0_type="c"):
+    """
+    Function for performing the Kwiatkowski-Phillips-Schmidt-Shin test for stationarity
+    Null Hypothesis: time series is stationary
+    Alternate Hypothesis: time series is not stationary
+    Parameters
+    ----------
+    x: pd.Series / np.array
+        The time series to be checked for stationarity
+    h0_type: str{'c', 'ct'}
+        Indicates the null hypothesis of the KPSS test:
+            * 'c': The data is stationary around a constant(default)
+            * 'ct': The data is stationary around a trend
+    Returns
+    -------
+    results: pd.DataFrame
+        A DataFrame with the KPSS test's results
+    """
+
+    indices = ["Test Statistic", "p-value", "# of Lags"]
+    kpss_test = kpss(x, regression=h0_type, nlags="auto")
+    results = pd.Series(kpss_test[0:3], index=indices)
+    for key, value in kpss_test[3].items():
+        results[f"Critical Value ({key})"] = value
+    return results
+
+
+def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
+    """
+    Function for testing the stationarity of a series by using:
+    * the ADF test
+    * the KPSS test
+    * ACF/PACF plots
+    Parameters
+    ----------
+    x: pd.Series / np.array
+        The time series to be checked for stationarity
+    n_lags : int
+        The number of lags for the ACF/PACF plots
+    alpha : float
+        Significance level for the ACF/PACF plots
+    h0_type: str{'c', 'ct'}
+        Indicates the null hypothesis of the KPSS test:
+            * 'c': The data is stationary around a constant(default)
+            * 'ct': The data is stationary around a trend
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure containing the ACF/PACF plot
+    """
+
+    adf_results = adf_test(x)
+    kpss_results = kpss_test(x, h0_type=h0_type)
+    print(
+        "ADF test statistic: {:.2f} (p-val: {:.2f})".format(
+            adf_results["Test Statistic"], adf_results["p-value"]
+        )
+    )
+    print(
+        "KPSS test statistic: {:.2f} (p-val: {:.2f})".format(
+            kpss_results["Test Statistic"], kpss_results["p-value"]
+        )
+    )
+    fig, ax = plt.subplots(2, figsize=(8, 4))
+    plot_acf(x, ax=ax[0], lags=n_lags, alpha=alpha)
+    plot_pacf(x, ax=ax[1], lags=n_lags, alpha=alpha)
+    return fig
+
+
+def decompose_time_series():
     src_data = "data/qd_gold.pkl"
     start = datetime(2000, 1, 1)
     end = datetime(2020, 12, 31)
@@ -41,16 +138,6 @@ if __name__ == "__main__":
     except FileNotFoundError:
         gold = quandl.get(dataset="WGC/GOLD_MONAVG_USD", start_date=start, end_date=end)
         gold.to_pickle(src_data)
-
-    src_data = "data/qd_gold_day.pkl"
-    try:
-        gold_day = pd.read_pickle(src_data)
-        print("data reading from file...")
-    except FileNotFoundError:
-        gold_day = quandl.get(dataset="WGC/GOLD_DAILY_USD", start_date=start, end_date=end)
-        gold_day.to_pickle(src_data)
-    gold.info()
-    gold_day.info()
 
     df = gold.copy()["2000-1":"2011-12"]
     ic(df.head())
@@ -73,7 +160,16 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im2.png")
     plt.close()
 
-    # Decomposing time series using Facebook's Prophet
+
+def decompose_with_prophet():
+    src_data = "data/qd_gold_day.pkl"
+    try:
+        gold_day = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        gold_day = quandl.get(dataset="WGC/GOLD_DAILY_USD", start_date=start, end_date=end)
+        gold_day.to_pickle(src_data)
+
     df = gold_day.copy()["2000-1":"2005-12"]
     df.reset_index(drop=False, inplace=True)
     df.rename(columns={"Date": "ds", "Value": "y"}, inplace=True)
@@ -112,7 +208,7 @@ if __name__ == "__main__":
     df_test.ds = pd.to_datetime(df_test.ds)
     df_test.set_index("ds", inplace=True)
 
-    fig, ax = plt.subplots(1, 1)
+    _, ax = plt.subplots(1, 1)
     ax = sns.lineplot(data=df_test[["y", "yhat_lower", "yhat_upper", "yhat"]])
     ax.fill_between(df_test.index, df_test.yhat_lower, df_test.yhat_upper, alpha=0.3)
     ax.set(title="Gold Price - actual vs. predicted", xlabel="Date", ylabel="Gold Price ($)")
@@ -120,58 +216,21 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im5.png")
     plt.close()
 
-    ## Testing for stationarity in time series
+
+def testing_stationary():
+    src_data = "data/qd_gold.pkl"
+    start = datetime(2000, 1, 1)
+    end = datetime(2020, 12, 31)
+    try:
+        gold = pd.read_pickle(src_data)
+        print("data reading from file...")
+    except FileNotFoundError:
+        gold = quandl.get(dataset="WGC/GOLD_MONAVG_USD", start_date=start, end_date=end)
+        gold.to_pickle(src_data)
+
     df = gold.copy()["2000-1-1":"2011-12-31"]
     df.rename(columns={"Value": "price"}, inplace=True)
     df = df.resample("M").last()
-
-    def adf_test(x):
-        """
-        Function for performing the Augmented Dickey-Fuller test for stationarity
-        Null Hypothesis: time series is not stationary
-        Alternate Hypothesis: time series is stationary
-        Parameters
-        ----------
-        x : pd.Series / np.array
-            The time series to be checked for stationarity
-        Returns
-        -------
-        results: pd.DataFrame
-            A DataFrame with the ADF test's results
-        """
-
-        indices = ["Test Statistic", "p-value", "# of Lags Used", "# of Observations Used"]
-        adf_test = adfuller(x, autolag="AIC")
-        results = pd.Series(adf_test[0:4], index=indices)
-        for key, value in adf_test[4].items():
-            results[f"Critical Value ({key})"] = value
-        return results
-
-    def kpss_test(x, h0_type="c"):
-        """
-        Function for performing the Kwiatkowski-Phillips-Schmidt-Shin test for stationarity
-        Null Hypothesis: time series is stationary
-        Alternate Hypothesis: time series is not stationary
-        Parameters
-        ----------
-        x: pd.Series / np.array
-            The time series to be checked for stationarity
-        h0_type: str{'c', 'ct'}
-            Indicates the null hypothesis of the KPSS test:
-                * 'c': The data is stationary around a constant(default)
-                * 'ct': The data is stationary around a trend
-        Returns
-        -------
-        results: pd.DataFrame
-            A DataFrame with the KPSS test's results
-        """
-
-        indices = ["Test Statistic", "p-value", "# of Lags"]
-        kpss_test = kpss(x, regression=h0_type, nlags="auto")
-        results = pd.Series(kpss_test[0:3], index=indices)
-        for key, value in kpss_test[3].items():
-            results[f"Critical Value ({key})"] = value
-        return results
 
     ic(adf_test(df.price))
     ic(kpss_test(df.price))
@@ -190,47 +249,6 @@ if __name__ == "__main__":
     df = gold.copy()["2000-1-1":"2011-12-31"]
     df.rename(columns={"Value": "price"}, inplace=True)
     df = df.resample("M").last()
-
-    def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
-        """
-        Function for testing the stationarity of a series by using:
-        * the ADF test
-        * the KPSS test
-        * ACF/PACF plots
-        Parameters
-        ----------
-        x: pd.Series / np.array
-            The time series to be checked for stationarity
-        n_lags : int
-            The number of lags for the ACF/PACF plots
-        alpha : float
-            Significance level for the ACF/PACF plots
-        h0_type: str{'c', 'ct'}
-            Indicates the null hypothesis of the KPSS test:
-                * 'c': The data is stationary around a constant(default)
-                * 'ct': The data is stationary around a trend
-        Returns
-        -------
-        fig : matplotlib.figure.Figure
-            Figure containing the ACF/PACF plot
-        """
-
-        adf_results = adf_test(x)
-        kpss_results = kpss_test(x, h0_type=h0_type)
-        print(
-            "ADF test statistic: {:.2f} (p-val: {:.2f})".format(
-                adf_results["Test Statistic"], adf_results["p-value"]
-            )
-        )
-        print(
-            "KPSS test statistic: {:.2f} (p-val: {:.2f})".format(
-                kpss_results["Test Statistic"], kpss_results["p-value"]
-            )
-        )
-        fig, ax = plt.subplots(2, figsize=(8, 4))
-        plot_acf(x, ax=ax[0], lags=n_lags, alpha=alpha)
-        plot_pacf(x, ax=ax[1], lags=n_lags, alpha=alpha)
-        return fig
 
     import cpi
 
@@ -254,7 +272,6 @@ if __name__ == "__main__":
     df["rolling_std_log"] = df.price_log.rolling(WINDOW).std()
 
     df[selected_columns].plot(title="Gold Price (logged)")
-
     plt.tight_layout()
     plt.savefig("images/ch3_im10.png")
     plt.close()
@@ -262,7 +279,7 @@ if __name__ == "__main__":
     # 4. Use the `test_autocorrelation` (helper function for this chapter)
     # to investigate if the series became stationary:
     plt.clf()
-    fig = test_autocorrelation(df.price_log)
+    test_autocorrelation(df.price_log)
     plt.tight_layout()
     plt.savefig("images/ch3_im11.png")
     plt.close()
@@ -279,7 +296,7 @@ if __name__ == "__main__":
     plt.savefig("images/ch3_im12.png")
 
     # 6. Test if the series became stationary:
-    fig = test_autocorrelation(df.price_log_diff.dropna())
+    test_autocorrelation(df.price_log_diff.dropna())
     plt.tight_layout()
     plt.savefig("images/ch3_im13.png")
 
@@ -289,11 +306,8 @@ if __name__ == "__main__":
     ic(f"Suggested # of differences (OSCB): {nsdiffs(df.price, m=12, test='ocsb')}")
     ic(f"Suggested # of differences (CH): {nsdiffs(df.price, m=12, test='ch')}")
 
-    ## Modeling time series with exponential smoothing methods
-    plt.set_cmap("cubehelix")
-    sns.set_palette("cubehelix")
-    COLORS = [plt.cm.cubehelix(x) for x in [0.1, 0.3, 0.5, 0.7]]
 
+def exponential_smoothing():
     src_data = "data/yf_google.pkl"
     start = datetime(2000, 1, 1)
     end = datetime(2020, 12, 31)
@@ -349,11 +363,11 @@ if __name__ == "__main__":
     hs_1 = Holt(goog_train).fit()
     hs_forecast_1 = hs_1.forecast(test_length)
     # Holt's model with exponential trend
-    hs_2 = Holt(goog_train, exponential=True).fit()
+    hs_2 = Holt(goog_train, exponential=True, damped=False).fit()
     # equivalent to ExponentialSmoothing(goog_train, trend='mul').fit()
     hs_forecast_2 = hs_2.forecast(test_length)
     # Holt's model with exponential trend and damping
-    hs_3 = Holt(goog_train, exponential=False, damped=True).fit(damping_slope=0.99)
+    hs_3 = Holt(goog_train, exponential=True, damped=True).fit(damping_slope=0.99)
     hs_forecast_3 = hs_3.forecast(test_length)
 
     # 9. Plot the original prices together with the models' results:
@@ -371,12 +385,22 @@ if __name__ == "__main__":
     SEASONAL_PERIODS = 12
     # Holt-Winter's model with exponential trend
     hw_1 = ExponentialSmoothing(
-        goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS
+        goog_train,
+        trend="mul",
+        seasonal="add",
+        seasonal_periods=SEASONAL_PERIODS,
+        damped=False,
+        initialization_method="estimated",
     ).fit()
     hw_forecast_1 = hw_1.forecast(test_length)
     # Holt-Winter's model with exponential trend and damping
     hw_2 = ExponentialSmoothing(
-        goog_train, trend="mul", seasonal="add", seasonal_periods=SEASONAL_PERIODS, damped=True
+        goog_train,
+        trend="mul",
+        seasonal="add",
+        seasonal_periods=SEASONAL_PERIODS,
+        damped=True,
+        initialization_method="estimated",
     ).fit()
     hw_forecast_2 = hw_2.forecast(test_length)
 
@@ -393,13 +417,14 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig("images/ch3_im17.png")
 
-    ## Modeling time series with ARIMA class models
+
+def arima_models():
     src_data = "data/yf_google.pkl"
     start = datetime(2000, 1, 1)
     end = datetime(2020, 12, 31)
     try:
         goog = pd.read_pickle(src_data)
-        print("data reading from file...")
+        print("data (google) reading from file...")
     except FileNotFoundError:
         goog = yf.download("GOOG", start=start, end=end, adjusted=True)
         goog.to_pickle(src_data)
@@ -412,7 +437,7 @@ if __name__ == "__main__":
     goog_diff.plot(ax=ax[1], title="First Differences")
     plt.tight_layout()
     plt.savefig("images/ch3_im18.png")
-    fig = test_autocorrelation(goog_diff)
+    test_autocorrelation(goog_diff)
     plt.tight_layout()
     plt.savefig("images/ch3_im19.png")
 
@@ -513,7 +538,7 @@ if __name__ == "__main__":
     ]
     auto_arima_pred = pd.concat(auto_arima_pred, axis=1).set_index(test.index)
 
-    fig, ax = plt.subplots(1)
+    _, ax = plt.subplots(1)
     ax = sns.lineplot(data=test, color=COLORS[0], label="Actual")
     ax.plot(arima_pred.prediction, c=COLORS[1], label="ARIMA(2,1,1)")
     ax.fill_between(
@@ -532,3 +557,20 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig("images/ch3_im25.png")
     plt.close()
+
+
+if __name__ == "__main__":
+    # ## Decomposing time series
+    # decompose_time_series()
+    #
+    # ## Decomposing time series using Facebook's Prophet
+    # decompose_with_prophet()
+    #
+    # ## Testing for stationarity in time series
+    # testing_stationary()
+    #
+    # ## Modeling time series with exponential smoothing methods
+    # exponential_smoothing()
+
+    ## Modeling time series with ARIMA class models
+    arima_models()

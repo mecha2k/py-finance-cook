@@ -20,13 +20,90 @@ from icecream import ic
 
 plt.style.use("seaborn")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 150
+plt.rcParams["figure.dpi"] = 300
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
-if __name__ == "__main__":
+
+def simulate_gbm(s_0, mu, sigma, n_sims, T, N, random_seed=42, antithetic_var=False):
+    """
+    Function used for simulating stock returns using Geometric Brownian Motion.
+    Parameters
+    ------------
+    s_0 : float
+        Initial stock price
+    mu : float
+        Drift coefficient
+    sigma : float
+        Diffusion coefficient
+    n_sims : int
+        Number of simulations paths
+    T : float
+        Length of the forecast horizon, same unit as dt
+    N : int
+        Number of time increments in the forecast horizon
+    random_seed : int
+        Random seed for reproducibility
+    antithetic_var : bool
+        Boolean whether to use antithetic variates approach to reduce variance
+    Returns
+    -----------
+    S_t : np.ndarray
+        Matrix (size: n_sims x (T+1)) containing the simulation results.
+        Rows respresent sample paths, while columns point of time.
+    """
+
+    np.random.seed(random_seed)
+    dt = T / N
+    # Brownian
+    if antithetic_var:
+        dW_ant = np.random.normal(scale=np.sqrt(dt), size=(int(n_sims / 2), N + 1))
+        dW = np.concatenate((dW_ant, -dW_ant), axis=0)
+    else:
+        dW = np.random.normal(scale=np.sqrt(dt), size=(n_sims, N + 1))
+    # simulate the evolution of the process
+    S_t = s_0 * np.exp(np.cumsum((mu - 0.5 * sigma ** 2) * dt + sigma * dW, axis=1))
+    S_t[:, 0] = s_0
+    return S_t
+
+
+def black_scholes_analytical(S_0, K, T, r, sigma, type_="call"):
+    """
+    Function used for calculating the price of European options
+    using the analytical form of the Black-Scholes model.
+    Parameters
+    ------------
+    S_0 : float
+        Initial stock price
+    K : float
+        Strike price
+    T : float
+        Time to maturity in years
+    r : float
+        Annualized risk-free rate
+    sigma : float
+        Standard deviation of the stock returns
+    type_ : str
+        Type of the option. Allowable: ['call', 'put']
+    Returns
+    -----------
+    option_premium : float
+        The premium on the option calculated using the Black-Scholes model
+    """
+    d1 = (np.log(S_0 / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = (np.log(S_0 / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    if type_ == "call":
+        val = S_0 * norm.cdf(d1, 0, 1) - K * np.exp(-r * T) * norm.cdf(d2, 0, 1)
+    elif type_ == "put":
+        val = K * np.exp(-r * T) * norm.cdf(-d2, 0, 1) - S_0 * norm.cdf(-d1, 0, 1)
+    else:
+        raise ValueError("Wrong input for type!")
+    return val
+
+
+def gaussian_brownian_motion():
     src_data = "data/yf_msft.pkl"
     start = datetime(2000, 1, 1)
     end = datetime(2020, 12, 31)
@@ -52,45 +129,10 @@ if __name__ == "__main__":
 
     T = len(test)
     N = len(test)
-    S_0 = adj_close[train.index[-1]]
+    S_0 = adj_close.loc[train.index[-1]]
     N_SIM = 100
     mu = train.mean()
     sigma = train.std()
-
-    def simulate_gbm(s_0, mu, sigma, n_sims, T, N, random_seed=42):
-        """
-        Function used for simulating stock returns using Geometric Brownian Motion.
-        Parameters
-        ------------
-        s_0 : float
-            Initial stock price
-        mu : float
-            Drift coefficient
-        sigma : float
-            Diffusion coefficient
-        n_sims : int
-            Number of simulations paths
-        T : float
-            Length of the forecast horizon, same unit as dt
-        N : int
-            Number of time increments in the forecast horizon
-        random_seed : int
-            Random seed for reproducibility
-        Returns
-        -----------
-        S_t : np.ndarray
-            Matrix (size: n_sims x (T+1)) containing the simulation results.
-            Rows respresent sample paths, while columns point of time.
-        """
-        np.random.seed(random_seed)
-        dt = T / N
-        dW = np.random.normal(scale=np.sqrt(dt), size=(n_sims, N))
-        W = np.cumsum(dW, axis=1)
-        time_step = np.linspace(dt, T, N)
-        time_steps = np.broadcast_to(time_step, (n_sims, N))
-        S_t = s_0 * np.exp((mu - 0.5 * sigma ** 2) * time_steps + sigma * W)
-        S_t = np.insert(S_t, 0, s_0, axis=1)
-        return S_t
 
     gbm_simulations = simulate_gbm(S_0, mu, sigma, N_SIM, T, N)
 
@@ -112,202 +154,106 @@ if __name__ == "__main__":
     plt.savefig("images/ch6_im2.png")
     plt.close()
 
-    def simulate_gbm(s_0, mu, sigma, n_sims, T, N, random_seed=42, antithetic_var=False):
-        """
-        Function used for simulating stock returns using Geometric Brownian Motion.
-        Parameters
-        ------------
-        s_0 : float
-            Initial stock price
-        mu : float
-            Drift coefficient
-        sigma : float
-            Diffusion coefficient
-        n_sims : int
-            Number of simulations paths
-        T : float
-            Length of the forecast horizon, same unit as dt
-        N : int
-            Number of time increments in the forecast horizon
-        random_seed : int
-            Random seed for reproducibility
-        antithetic_var : bool
-            Boolean whether to use antithetic variates approach to reduce variance
-        Returns
-        -----------
-        S_t : np.ndarray
-            Matrix (size: n_sims x (T+1)) containing the simulation results.
-            Rows respresent sample paths, while columns point of time.
-        """
 
-        np.random.seed(random_seed)
-        dt = T / N
-        # Brownian
-        if antithetic_var:
-            dW_ant = np.random.normal(scale=np.sqrt(dt), size=(int(n_sims / 2), N + 1))
-            dW = np.concatenate((dW_ant, -dW_ant), axis=0)
-        else:
-            dW = np.random.normal(scale=np.sqrt(dt), size=(n_sims, N + 1))
-        # simulate the evolution of the process
-        S_t = s_0 * np.exp(np.cumsum((mu - 0.5 * sigma ** 2) * dt + sigma * dW, axis=1))
-        S_t[:, 0] = s_0
-        return S_t
+def european_option_simulation(S_0, K, T, r, sigma, n_sims, type_="call", random_seed=42):
+    """
+    Function used for calculating the price of European options using Monte Carlo simulations.
+    Parameters
+    ------------
+    S_0 : float
+        Initial stock price
+    K : float
+        Strike price
+    T : float
+        Time to maturity in years
+    r : float
+        Annualized risk-free rate
+    sigma : float
+        Standard deviation of the stock returns
+    n_sims : int
+        Number of paths to simulate
+    type_ : str
+        Type of the option. Allowable: ['call', 'put']
+    random_seed : int
+        Random seed for reproducibility
+    Returns
+    -----------
+    option_premium : float
+        The premium on the option calculated using Monte Carlo simulations
+    """
+    np.random.seed(random_seed)
+    rv = np.random.normal(0, 1, size=n_sims)
+    S_T = S_0 * np.exp((r - 0.5 * sigma ** 2) * T + sigma * np.sqrt(T) * rv)
+    if type_ == "call":
+        payoff = np.maximum(0, S_T - K)
+    elif type_ == "put":
+        payoff = np.maximum(0, K - S_T)
+    else:
+        raise ValueError("Wrong input for type!")
+    premium = np.mean(payoff) * np.exp(-r * T)
+    return premium
 
-    ## Pricing European Options using Simulations
-    S_0 = 100
-    K = 100
-    r = 0.05
-    sigma = 0.50
-    T = 1  # 1 year
-    N = 252  # 252 days in a year
-    dt = T / N  # time step
-    N_SIMS = 1000000  # number of simulations
-    discount_factor = np.exp(-r * T)
 
-    def black_scholes_analytical(S_0, K, T, r, sigma, type_="call"):
-        """
-        Function used for calculating the price of European options
-        using the analytical form of the Black-Scholes model.
-        Parameters
-        ------------
-        S_0 : float
-            Initial stock price
-        K : float
-            Strike price
-        T : float
-            Time to maturity in years
-        r : float
-            Annualized risk-free rate
-        sigma : float
-            Standard deviation of the stock returns
-        type_ : str
-            Type of the option. Allowable: ['call', 'put']
-        Returns
-        -----------
-        option_premium : float
-            The premium on the option calculated using the Black-Scholes model
-        """
-        d1 = (np.log(S_0 / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-        d2 = (np.log(S_0 / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-        if type_ == "call":
-            val = S_0 * norm.cdf(d1, 0, 1) - K * np.exp(-r * T) * norm.cdf(d2, 0, 1)
-        elif type_ == "put":
-            val = K * np.exp(-r * T) * norm.cdf(-d2, 0, 1) - S_0 * norm.cdf(-d1, 0, 1)
-        else:
-            raise ValueError("Wrong input for type!")
-        return val
+def lsmc_american_option(S_0, K, T, N, r, sigma, n_sims, option_type, poly_degree, random_seed=42):
+    """
+    Function used for calculating the price of American options using Least Squares Monte Carlo
+    algorithm of Longstaff and Schwartz (2001).
+    Parameters
+    ------------
+    S_0 : float
+        Initial stock price
+    K : float
+        Strike price
+    T : float
+        Time to maturity in years
+    N : int
+        Number of time increments in the forecast horizon
+    r : float
+        Annualized risk-free rate
+    sigma : float
+        Standard deviation of the stock returns
+    n_sims : int
+        Number of paths to simulate
+    option_type : str
+        Type of the option. Allowable: ['call', 'put']
+    poly_degree : int
+        Degree of the polynomial to fit in the LSMC algorithm
+    random_seed : int
+        Random seed for reproducibility
+    Returns
+    -----------
+    option_premium : float
+        The premium on the option
+    """
+    dt = T / N
+    discount_factor = np.exp(-r * dt)
+    gbm_simulations = simulate_gbm(
+        s_0=S_0, mu=r, sigma=sigma, n_sims=n_sims, T=T, N=N, random_seed=random_seed
+    )
+    if option_type == "call":
+        payoff_matrix = np.maximum(gbm_simulations - K, np.zeros_like(gbm_simulations))
+    elif option_type == "put":
+        payoff_matrix = np.maximum(K - gbm_simulations, np.zeros_like(gbm_simulations))
+    else:
+        payoff_matrix = None
+    value_matrix = np.zeros_like(payoff_matrix)
+    value_matrix[:, -1] = payoff_matrix[:, -1]
 
-    # 4. Valuate the call option using the specified parameters:
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
-    # 5. Simulate the stock path using GBM:
-    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
-    # 6. Calculate the option premium:
-    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
-    ic(premium)
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
-
-    def european_option_simulation(S_0, K, T, r, sigma, n_sims, type_="call", random_seed=42):
-        """
-        Function used for calculating the price of European options using Monte Carlo simulations.
-        Parameters
-        ------------
-        S_0 : float
-            Initial stock price
-        K : float
-            Strike price
-        T : float
-            Time to maturity in years
-        r : float
-            Annualized risk-free rate
-        sigma : float
-            Standard deviation of the stock returns
-        n_sims : int
-            Number of paths to simulate
-        type_ : str
-            Type of the option. Allowable: ['call', 'put']
-        random_seed : int
-            Random seed for reproducibility
-        Returns
-        -----------
-        option_premium : float
-            The premium on the option calculated using Monte Carlo simulations
-        """
-        np.random.seed(random_seed)
-        rv = np.random.normal(0, 1, size=n_sims)
-        S_T = S_0 * np.exp((r - 0.5 * sigma ** 2) * T + sigma * np.sqrt(T) * rv)
-        if type_ == "call":
-            payoff = np.maximum(0, S_T - K)
-        elif type_ == "put":
-            payoff = np.maximum(0, K - S_T)
-        else:
-            raise ValueError("Wrong input for type!")
-        premium = np.mean(payoff) * np.exp(-r * T)
-        return premium
-
-    def lsmc_american_option(
-        S_0, K, T, N, r, sigma, n_sims, option_type, poly_degree, random_seed=42
-    ):
-        """
-        Function used for calculating the price of American options using Least Squares Monte Carlo
-        algorithm of Longstaff and Schwartz (2001).
-        Parameters
-        ------------
-        S_0 : float
-            Initial stock price
-        K : float
-            Strike price
-        T : float
-            Time to maturity in years
-        N : int
-            Number of time increments in the forecast horizon
-        r : float
-            Annualized risk-free rate
-        sigma : float
-            Standard deviation of the stock returns
-        n_sims : int
-            Number of paths to simulate
-        option_type : str
-            Type of the option. Allowable: ['call', 'put']
-        poly_degree : int
-            Degree of the polynomial to fit in the LSMC algorithm
-        random_seed : int
-            Random seed for reproducibility
-        Returns
-        -----------
-        option_premium : float
-            The premium on the option
-        """
-
-        dt = T / N
-        discount_factor = np.exp(-r * dt)
-        gbm_simulations = simulate_gbm(
-            s_0=S_0, mu=r, sigma=sigma, n_sims=n_sims, T=T, N=N, random_seed=random_seed
+    for t in range(N - 1, 0, -1):
+        regression = np.polyfit(
+            gbm_simulations[:, t], value_matrix[:, t + 1] * discount_factor, poly_degree
         )
-        if option_type == "call":
-            payoff_matrix = np.maximum(gbm_simulations - K, np.zeros_like(gbm_simulations))
-        elif option_type == "put":
-            payoff_matrix = np.maximum(K - gbm_simulations, np.zeros_like(gbm_simulations))
-        else:
-            payoff_matrix = None
-        value_matrix = np.zeros_like(payoff_matrix)
-        value_matrix[:, -1] = payoff_matrix[:, -1]
+        continuation_value = np.polyval(regression, gbm_simulations[:, t])
+        value_matrix[:, t] = np.where(
+            payoff_matrix[:, t] > continuation_value,
+            payoff_matrix[:, t],
+            value_matrix[:, t + 1] * discount_factor,
+        )
+    option_premium = np.mean(value_matrix[:, 1] * discount_factor)
+    return option_premium
 
-        for t in range(N - 1, 0, -1):
-            regression = np.polyfit(
-                gbm_simulations[:, t], value_matrix[:, t + 1] * discount_factor, poly_degree
-            )
-            continuation_value = np.polyval(regression, gbm_simulations[:, t])
-            value_matrix[:, t] = np.where(
-                payoff_matrix[:, t] > continuation_value,
-                payoff_matrix[:, t],
-                value_matrix[:, t + 1] * discount_factor,
-            )
-        option_premium = np.mean(value_matrix[:, 1] * discount_factor)
-        return option_premium
 
-    ic(european_option_simulation(S_0, K, T, r, sigma, N_SIMS, type_="put"))
-
-    ## Pricing American Options with Least Squares Monte Carlo
+def american_options_montecarlo():
     S_0 = 36
     K = 40
     r = 0.06
@@ -359,8 +305,10 @@ if __name__ == "__main__":
         f"The price of the European call is {european_call_price:.3f}, "
         f"and the American call's price (using {N_SIMS} simulations) is {american_call_price:.3f}"
     )
+    ic(european_option_simulation(S_0, K, T, r, sigma, N_SIMS, type_="put"))
 
-    ## Pricing American Options using Quantlib
+
+def american_options_quantlib():
     S_0 = 36
     r = 0.06
     sigma = 0.2
@@ -431,7 +379,8 @@ if __name__ == "__main__":
     delta = (P_plus_h - P_minus_h) / (2 * h)
     print(f"Delta of the option: {delta:.2f}")
 
-    ## Estimating Value-at-risk using Monte Carlo
+
+def value_at_risk():
     np.random.seed(42)
     risky_assets = ["GOOG", "FB"]
     SHARES = [5, 5]
@@ -498,3 +447,40 @@ if __name__ == "__main__":
     print(
         f"The 1-day 95% VaR is {-var:.2f}$, and the accompanying Expected Shortfall is {-expected_shortfall:.2f}$."
     )
+
+
+def pricing_european_options():
+    S_0 = 100
+    K = 100
+    r = 0.05
+    sigma = 0.50
+    T = 1  # 1 year
+    N = 252  # 252 days in a year
+    dt = T / N  # time step
+    N_SIMS = 1000000  # number of simulations
+    discount_factor = np.exp(-r * T)
+
+    # 4. Valuate the call option using the specified parameters:
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
+    # 5. Simulate the stock path using GBM:
+    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
+    # 6. Calculate the option premium:
+    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
+    ic(premium)
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
+
+
+if __name__ == "__main__":
+    gaussian_brownian_motion()
+
+    ## Pricing European Options using Simulations
+    pricing_european_options()
+
+    ## Pricing American Options with Least Squares Monte Carlo
+    american_options_montecarlo()
+
+    ## Pricing American Options using Quantlib
+    american_options_quantlib()
+
+    ## Estimating Value-at-risk using Monte Carlo
+    value_at_risk()
