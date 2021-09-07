@@ -449,10 +449,7 @@ def value_at_risk():
     )
 
 
-if __name__ == "__main__":
-    gaussian_brownian_motion()
-
-    ## Pricing European Options using Simulations
+def pricing_european_options():
     S_0 = 100
     K = 100
     r = 0.05
@@ -471,6 +468,13 @@ if __name__ == "__main__":
     premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
     ic(premium)
     ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
+
+
+if __name__ == "__main__":
+    gaussian_brownian_motion()
+
+    ## Pricing European Options using Simulations
+    pricing_european_options()
 
     ## Pricing American Options with Least Squares Monte Carlo
     american_options_montecarlo()
