@@ -29,39 +29,9 @@ load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
 if __name__ == "__main__":
-    risky_assets = ["AAPL", "IBM", "MSFT", "TWTR"]
-    n_assets = len(risky_assets)
-    src_data = "data/yf_assets_c07_1.pkl"
-    start = datetime(2000, 1, 1)
-    end = datetime(2020, 12, 31)
-    try:
-        data = pd.read_pickle(src_data)
-        print("data reading from file...")
-    except FileNotFoundError:
-        data = yf.download(risky_assets, start=start, end=end, adjusted=True, progress=False)
-        data.to_pickle(src_data)
-    prices_df = data["2017":"2018"]
-
-    prices_df["Adj Close"].plot(title="Stock prices of the considered assets")
-    plt.savefig("images/ch7_im1.png")
-
-    returns = prices_df["Adj Close"].pct_change().dropna()
-    portfolio_weights = n_assets * [1 / n_assets]
-    portfolio_returns = pd.Series(np.dot(portfolio_weights, returns.T), index=returns.index)
-
-    from IPython.display import display, HTML
-
-    pf.create_simple_tear_sheet(portfolio_returns)
-    fig = pf.create_returns_tear_sheet(portfolio_returns, return_fig=True)
-    fig.savefig("images/ch7_im01.png", dpi=300)
-
-    ## Finding the Efficient Frontier using Monte Carlo simulations
-    N_PORTFOLIOS = 10 ** 5
-    N_DAYS = 252
     risky_assets = ["FB", "TSLA", "TWTR", "MSFT"]
     risky_assets.sort()
     n_assets = len(risky_assets)
-
     src_data = "data/yf_assets_c07_2.pkl"
     try:
         data = pd.read_pickle(src_data)
@@ -74,6 +44,10 @@ if __name__ == "__main__":
     prices_df["Adj Close"].plot(title="Stock prices of the considered assets")
     plt.tight_layout()
     plt.savefig("images/ch7_im2.png")
+
+    ## Finding the Efficient Frontier using Monte Carlo simulations
+    N_PORTFOLIOS = 10 ** 5
+    N_DAYS = 252
 
     returns_df = prices_df["Adj Close"].pct_change().dropna()
     avg_returns = returns_df.mean() * N_DAYS
