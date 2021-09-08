@@ -58,17 +58,22 @@ if __name__ == "__main__":
 
     np.random.seed(42)
     weights = np.random.random(size=(N_PORTFOLIOS, n_assets))
-    weights /= np.sum(weights, axis=1)[:, np.newaxis]
+    ic(weights.shape)
+    weights_sum = np.sum(weights, axis=1).reshape(-1, 1)
+    weights /= weights_sum
+    # weights /= np.sum(weights, axis=1)[:, np.newaxis]
+    ic(weights.shape)
 
     # 6. Calculate portfolio metrics:
     portf_rtns = np.dot(weights, avg_returns)
+    ic(portf_rtns)
     portf_vol = []
     for i in range(0, len(weights)):
         portf_vol.append(np.sqrt(np.dot(weights[i].T, np.dot(cov_mat, weights[i]))))
+    ic(len(portf_vol))
     portf_vol = np.array(portf_vol)
+    ic(portf_vol.shape)
     portf_sharpe_ratio = portf_rtns / portf_vol
-
-    # 7. Create a joint DataFrame with all data:
     portf_results_df = pd.DataFrame(
         {"returns": portf_rtns, "volatility": portf_vol, "sharpe_ratio": portf_sharpe_ratio}
     )
