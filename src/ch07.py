@@ -50,8 +50,8 @@ if __name__ == "__main__":
     N_DAYS = 252
 
     returns_df = prices_df["Adj Close"].pct_change().dropna()
-    avg_returns = returns_df.mean() * N_DAYS
-    cov_mat = returns_df.cov() * N_DAYS
+    avg_returns = returns_df.mean(axis=0) * N_DAYS
+    cov_mat = returns_df.cov(ddof=1) * N_DAYS
     returns_df.plot(title="Daily returns of the considered assets")
     plt.tight_layout()
     plt.savefig("images/ch7_im3.png")
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     portf_rtns = np.dot(weights, avg_returns)
     ic(portf_rtns)
     portf_vol = []
-    for i in range(0, len(weights)):
+    for i in range(len(weights)):
         portf_vol.append(np.sqrt(np.dot(weights[i].T, np.dot(cov_mat, weights[i]))))
     ic(len(portf_vol))
     portf_vol = np.array(portf_vol)
@@ -77,6 +77,7 @@ if __name__ == "__main__":
     portf_results_df = pd.DataFrame(
         {"returns": portf_rtns, "volatility": portf_vol, "sharpe_ratio": portf_sharpe_ratio}
     )
+    ic(portf_results_df.head())
 
     # 8. Locate the points creating the Efficient Frontier:
     N_POINTS = 100
