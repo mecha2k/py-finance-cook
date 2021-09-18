@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import warnings
 import cufflinks as cf
 import backtrader as bt
+import talib
 
 from datetime import datetime
 from icecream import ic

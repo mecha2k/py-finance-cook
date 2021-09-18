@@ -560,17 +560,17 @@ def arima_models():
 
 
 if __name__ == "__main__":
-    # ## Decomposing time series
-    # decompose_time_series()
-    #
-    # ## Decomposing time series using Facebook's Prophet
-    # decompose_with_prophet()
-    #
-    # ## Testing for stationarity in time series
-    # testing_stationary()
-    #
-    # ## Modeling time series with exponential smoothing methods
-    # exponential_smoothing()
+    ## Decomposing time series
+    decompose_time_series()
+
+    ## Decomposing time series using Facebook's Prophet
+    decompose_with_prophet()
+
+    ## Testing for stationarity in time series
+    testing_stationary()
+
+    ## Modeling time series with exponential smoothing methods
+    exponential_smoothing()
 
     ## Modeling time series with ARIMA class models
     arima_models()
