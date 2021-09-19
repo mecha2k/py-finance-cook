@@ -13,7 +13,7 @@ from plotly.offline import iplot, init_notebook_mode
 # plt.style.use("default")
 plt.style.use("seaborn-colorblind")
 plt.rcParams["figure.figsize"] = [8, 5]
-plt.rcParams["figure.dpi"] = 300
+plt.rcParams["figure.dpi"] = 150
 # warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
     cerebro.run()
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    # cerebro.plot(iplot=False, volume=False)
+    cerebro.plot(iplot=False, volume=False)
 
     ## Building an Interactive Dashboard for Technical Analysis
     # import ipywidgets as wd

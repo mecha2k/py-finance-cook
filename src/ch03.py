@@ -253,7 +253,7 @@ def testing_stationary():
     import cpi
 
     # update the CPI data (if needed)
-    # cpi.update()
+    cpi.update()
 
     # 2. Deflate the gold prices (to 2011-12-31 USD values) and plot the results:
     DEFL_DATE = date(2011, 12, 31)
