@@ -431,14 +431,12 @@ def value_at_risk():
     var = np.percentile(P_diff_sorted, percentiles)
     for x, y in zip(percentiles, var):
         print(f"1-day VaR with {100-x}% confidence: {-y:.2f}$")
+    df = pd.DataFrame(P_diff)
+    print(df.describe())
 
-    ax = sns.distplot(P_diff, kde=False)
-    ax.set_title(
-        """Distribution of possible 1-day changes in portfolio value
-                 1-day 99% VaR""",
-        fontsize=16,
-    )
-    ax.axvline(var[2], 0, 10000)
+    df.hist(bins=32, figsize=(8, 6))
+    plt.title("Distribution of possible 1-day changes in portfolio value 1-day 99% VaR")
+    plt.axvline(var[2], 0, 10000, color="r", linewidth=3)
     plt.tight_layout()
     plt.savefig("images/ch6_im4.png")
 
@@ -473,14 +471,14 @@ def pricing_european_options():
 if __name__ == "__main__":
     gaussian_brownian_motion()
 
-    ## Pricing European Options using Simulations
-    pricing_european_options()
-
-    ## Pricing American Options with Least Squares Monte Carlo
-    american_options_montecarlo()
-
-    ## Pricing American Options using Quantlib
-    american_options_quantlib()
+    # ## Pricing European Options using Simulations
+    # pricing_european_options()
+    #
+    # ## Pricing American Options with Least Squares Monte Carlo
+    # american_options_montecarlo()
+    #
+    # ## Pricing American Options using Quantlib
+    # american_options_quantlib()
 
     ## Estimating Value-at-risk using Monte Carlo
     value_at_risk()
