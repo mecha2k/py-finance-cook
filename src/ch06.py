@@ -380,6 +380,27 @@ def american_options_quantlib():
     print(f"Delta of the option: {delta:.2f}")
 
 
+def pricing_european_options():
+    S_0 = 100
+    K = 100
+    r = 0.05
+    sigma = 0.50
+    T = 1  # 1 year
+    N = 252  # 252 days in a year
+    dt = T / N  # time step
+    N_SIMS = 1000000  # number of simulations
+    discount_factor = np.exp(-r * T)
+
+    # 4. Valuate the call option using the specified parameters:
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
+    # 5. Simulate the stock path using GBM:
+    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
+    # 6. Calculate the option premium:
+    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
+    ic(premium)
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
+
+
 def value_at_risk():
     np.random.seed(42)
     risky_assets = ["GOOG", "FB"]
@@ -388,6 +409,8 @@ def value_at_risk():
     N_SIMS = 10 ** 5
 
     src_data = "data/yf_assets_c06_1.pkl"
+    start = datetime(2018, 1, 1)
+    end = datetime(2018, 12, 31)
     try:
         data = pd.read_pickle(src_data)
         print("data reading from file...")
@@ -445,27 +468,6 @@ def value_at_risk():
     print(
         f"The 1-day 95% VaR is {-var:.2f}$, and the accompanying Expected Shortfall is {-expected_shortfall:.2f}$."
     )
-
-
-def pricing_european_options():
-    S_0 = 100
-    K = 100
-    r = 0.05
-    sigma = 0.50
-    T = 1  # 1 year
-    N = 252  # 252 days in a year
-    dt = T / N  # time step
-    N_SIMS = 1000000  # number of simulations
-    discount_factor = np.exp(-r * T)
-
-    # 4. Valuate the call option using the specified parameters:
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
-    # 5. Simulate the stock path using GBM:
-    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
-    # 6. Calculate the option premium:
-    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
-    ic(premium)
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
 
 
 if __name__ == "__main__":
