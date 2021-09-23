@@ -380,6 +380,27 @@ def american_options_quantlib():
     print(f"Delta of the option: {delta:.2f}")
 
 
+def pricing_european_options():
+    S_0 = 100
+    K = 100
+    r = 0.05
+    sigma = 0.50
+    T = 1  # 1 year
+    N = 252  # 252 days in a year
+    dt = T / N  # time step
+    N_SIMS = 1000000  # number of simulations
+    discount_factor = np.exp(-r * T)
+
+    # 4. Valuate the call option using the specified parameters:
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
+    # 5. Simulate the stock path using GBM:
+    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
+    # 6. Calculate the option premium:
+    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
+    ic(premium)
+    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
+
+
 def value_at_risk():
     np.random.seed(42)
     risky_assets = ["GOOG", "FB"]
@@ -388,6 +409,8 @@ def value_at_risk():
     N_SIMS = 10 ** 5
 
     src_data = "data/yf_assets_c06_1.pkl"
+    start = datetime(2018, 1, 1)
+    end = datetime(2018, 12, 31)
     try:
         data = pd.read_pickle(src_data)
         print("data reading from file...")
@@ -431,14 +454,12 @@ def value_at_risk():
     var = np.percentile(P_diff_sorted, percentiles)
     for x, y in zip(percentiles, var):
         print(f"1-day VaR with {100-x}% confidence: {-y:.2f}$")
+    df = pd.DataFrame(P_diff)
+    print(df.describe())
 
-    ax = sns.distplot(P_diff, kde=False)
-    ax.set_title(
-        """Distribution of possible 1-day changes in portfolio value
-                 1-day 99% VaR""",
-        fontsize=16,
-    )
-    ax.axvline(var[2], 0, 10000)
+    df.hist(bins=32, figsize=(8, 6))
+    plt.title("Distribution of possible 1-day changes in portfolio value 1-day 99% VaR")
+    plt.axvline(var[2], 0, 10000, color="r", linewidth=3)
     plt.tight_layout()
     plt.savefig("images/ch6_im4.png")
 
@@ -449,38 +470,17 @@ def value_at_risk():
     )
 
 
-def pricing_european_options():
-    S_0 = 100
-    K = 100
-    r = 0.05
-    sigma = 0.50
-    T = 1  # 1 year
-    N = 252  # 252 days in a year
-    dt = T / N  # time step
-    N_SIMS = 1000000  # number of simulations
-    discount_factor = np.exp(-r * T)
-
-    # 4. Valuate the call option using the specified parameters:
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="call"))
-    # 5. Simulate the stock path using GBM:
-    gbm_sims = simulate_gbm(s_0=S_0, mu=r, sigma=sigma, n_sims=N_SIMS, T=T, N=N)
-    # 6. Calculate the option premium:
-    premium = discount_factor * np.mean(np.maximum(0, gbm_sims[:, -1] - K))
-    ic(premium)
-    ic(black_scholes_analytical(S_0=S_0, K=K, T=T, r=r, sigma=sigma, type_="put"))
-
-
 if __name__ == "__main__":
     gaussian_brownian_motion()
 
-    ## Pricing European Options using Simulations
-    pricing_european_options()
-
-    ## Pricing American Options with Least Squares Monte Carlo
-    american_options_montecarlo()
-
-    ## Pricing American Options using Quantlib
-    american_options_quantlib()
+    # ## Pricing European Options using Simulations
+    # pricing_european_options()
+    #
+    # ## Pricing American Options with Least Squares Monte Carlo
+    # american_options_montecarlo()
+    #
+    # ## Pricing American Options using Quantlib
+    # american_options_quantlib()
 
     ## Estimating Value-at-risk using Monte Carlo
     value_at_risk()

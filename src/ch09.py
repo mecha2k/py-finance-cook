@@ -194,7 +194,7 @@ if __name__ == "__main__":
     )
     plt.savefig("images/ch9_im2.png", dpi=300)
 
-    xgb = XGBClassifier(random_state=42)
+    xgb = XGBClassifier(random_state=42, use_label_encoder=False)
     xgb_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", xgb)])
     xgb_pipeline.fit(X_train, y_train)
     xgb_perf = performance_evaluation_report(
