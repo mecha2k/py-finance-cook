@@ -744,8 +744,8 @@ def bayesian_optimization(evals=200):
 
 if __name__ == "__main__":
     start = time.time()
-    advanced_classifiers(nsearch=2)
-    stacking_improved()
-    different_approaches()
+    # advanced_classifiers(nsearch=2)
+    # stacking_improved()
+    # different_approaches()
     bayesian_optimization(evals=2)
     ic(f"elapsed time : {time.time()-start}")
