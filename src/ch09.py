@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
+import pickle
+import time
 
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
@@ -28,6 +30,10 @@ from imblearn.under_sampling import RandomUnderSampler
 from collections import Counter
 from eli5.sklearn import PermutationImportance
 from imblearn.ensemble import BalancedRandomForestClassifier
+from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from pandas.io.json import json_normalize
+from hyperopt.pyll.stochastic import sample
 
 from icecream import ic
 
@@ -641,13 +647,6 @@ def different_approaches():
     ic(results)
 
 
-import pickle
-from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
-from sklearn.model_selection import cross_val_score, StratifiedKFold
-from pandas.io.json import json_normalize
-from hyperopt.pyll.stochastic import sample
-
-
 def bayesian_optimization():
     df = pd.read_csv("data/credit_card_fraud.csv")
     X = df.copy()
@@ -657,7 +656,7 @@ def bayesian_optimization():
     )
 
     N_FOLDS = 5
-    MAX_EVALS = 2
+    MAX_EVALS = 200
 
     def objective(params, n_folds=N_FOLDS, random_state=42):
         model = LGBMClassifier(**params, num_leaves=64)
@@ -682,7 +681,7 @@ def bayesian_optimization():
     )
 
     # load if already finished the search
-    best_set = pickle.load(open("data/best_set.p", "rb"))
+    # best_set = pickle.load(open("data/best_set.p", "rb"))
     ic(best_set)
 
     boosting_type = {0: "gbdt", 1: "dart", 2: "goss"}
@@ -744,7 +743,9 @@ def bayesian_optimization():
 
 
 if __name__ == "__main__":
-    # advanced_classifiers(nsearch=2)
-    # stacking_improved()
-    # different_approaches()
+    start = time.time()
+    advanced_classifiers(nsearch=100)
+    stacking_improved()
+    different_approaches()
     bayesian_optimization()
+    ic(f"elapsed time : {time.time()-start}")
