@@ -15,6 +15,19 @@ from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn import metrics
 from xgboost.sklearn import XGBClassifier
 from lightgbm import LGBMClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import StackingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.inspection import permutation_importance
+from sklearn.base import clone
+from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
+from imblearn.under_sampling import RandomUnderSampler
+from collections import Counter
+from eli5.sklearn import PermutationImportance
+from imblearn.ensemble import BalancedRandomForestClassifier
 
 from icecream import ic
 
@@ -379,589 +392,260 @@ def advanced_classifiers(nsearch=100):
     results_comparison.to_csv("data/results_comparison.csv")
     ic(results_comparison)
 
+    ## Investigating the feature importance
+    # in case we have the fitted grid search object `rf_rs`, we extract the best pipeline
+    # rf_pipeline = rf_rs.best_estimator_
+
+    rf_classifier = rf_pipeline.named_steps["classifier"]
+    preprocessor = rf_pipeline.named_steps["preprocessor"]
+
+    # in case we want to manually assign hyperparameters based on previous grid search
+    # best_parameters =  {'n_estimators': 400, 'min_samples_split': 2,
+    #                     'min_samples_leaf': 49, 'max_features': None,
+    #                     'max_depth': 20, 'bootstrap': True, 'random_state': 42}
+    # rf_classifier = rf_classifier.set_params(**best_parameters)
+
+    feat_names = (
+        preprocessor.named_transformers_["categorical"]
+        .named_steps["onehot"]
+        .get_feature_names(input_features=cat_features)
+    )
+    feat_names = np.r_[num_features, feat_names]
+
+    X_train_preprocessed = pd.DataFrame(preprocessor.transform(X_train), columns=feat_names)
+
+    rf_feat_imp = pd.DataFrame(
+        rf_classifier.feature_importances_, index=feat_names, columns=["mdi"]
+    )
+    rf_feat_imp = rf_feat_imp.sort_values("mdi", ascending=False)
+    rf_feat_imp["cumul_importance_mdi"] = np.cumsum(rf_feat_imp.mdi)
+
+    def plot_most_important_features(feat_imp, method="MDI", n_features=10, bottom=False):
+        """
+        Function for plotting the top/bottom x features in terms of their importance.
+        Parameters
+        ----------
+        feat_imp : pd.Series
+            A pd.Series with calculated feature importances
+        method : str
+            A string representing the method of calculating the importances.
+            Used for the title of the plot.
+        n_features : int
+            Number of top/bottom features to plot
+        bottom : boolean
+            Indicates if the plot should contain the bottom feature importances.
+        Returns
+        -------
+        ax : matplotlib.axes._subplots.AxesSubplot
+            Ax cointaining the plot
+        """
+
+        if bottom:
+            indicator = "Bottom"
+            feat_imp = feat_imp.sort_values(ascending=True)
+        else:
+            indicator = "Top"
+            feat_imp = feat_imp.sort_values(ascending=False)
+        ax = feat_imp.head(n_features).plot.barh()
+        ax.invert_yaxis()
+        ax.set(
+            title=f"Feature importance - {method} ({indicator} {n_features})",
+            xlabel="Importance",
+            ylabel="Feature",
+        )
+        return ax
+
+    plot_most_important_features(rf_feat_imp.mdi, method="MDI")
+    plt.savefig("images/ch9_im7.png", dpi=300, bbox_inches="tight")
+
+    x_values = range(len(feat_names))
+    fig, ax = plt.subplots()
+    ax.plot(x_values, rf_feat_imp.cumul_importance_mdi, "b-")
+    ax.hlines(y=0.95, xmin=0, xmax=len(x_values), color="g", linestyles="dashed")
+    ax.set(title="Cumulative Importances", xlabel="Variable", ylabel="Importance")
+    plt.savefig("images/ch9_im8.png", dpi=300, bbox_inches="tight")
+    print(
+        f"Top 10 features account for {100 * rf_feat_imp.head(10).mdi.sum():.2f}% of the total importance."
+    )
+    print(
+        f"Top {rf_feat_imp[rf_feat_imp.cumul_importance_mdi <= 0.95].shape[0]} features account for 95% of importance."
+    )
+
+    perm = PermutationImportance(rf_classifier, n_iter=25, random_state=42)
+    perm.fit(X_train_preprocessed, y_train)
+    rf_feat_imp["permutation"] = perm.feature_importances_
+
+    plot_most_important_features(rf_feat_imp.permutation, method="Permutation")
+    plt.savefig("images/ch9_im9.png", dpi=300, bbox_inches="tight")
+
+    def drop_col_feat_imp(model, X, y, random_state=42):
+        """
+        Function for calculating the drop column feature importance.
+        Parameters
+        ----------
+        model : scikit-learn's model
+            Object representing the estimator with selected hyperparameters.
+        X : pd.DataFrame
+            Features for training the model
+        y : pd.Series
+            The target
+        random_state : int
+            Random state for reproducibility
+        Returns
+        -------
+        importances : list
+            List containing the calculated feature importances in the order of appearing in X
+        """
+
+        model_clone = clone(model)
+        model_clone.random_state = random_state
+        model_clone.fit(X, y)
+        benchmark_score = model_clone.score(X, y)
+        importances = []
+        for col in X.columns:
+            model_clone = clone(model)
+            model_clone.random_state = random_state
+            model_clone.fit(X.drop(col, axis=1), y)
+            drop_col_score = model_clone.score(X.drop(col, axis=1), y)
+            importances.append(benchmark_score - drop_col_score)
+        return importances
+
+    rf_feat_imp["drop_column"] = drop_col_feat_imp(
+        rf_classifier, X_train_preprocessed, y_train, random_state=42
+    )
+    plot_most_important_features(rf_feat_imp.drop_column, method="Drop column")
+    plt.savefig("images/ch9_im10.png", dpi=300, bbox_inches="tight")
+
+    plot_most_important_features(rf_feat_imp.drop_column, method="Drop column", bottom=True)
+    plt.savefig("images/ch9_im11.png", dpi=300, bbox_inches="tight")
+
+
+def stacking_improved():
+    df = pd.read_csv("data/credit_card_fraud.csv")
+    X = df.copy()
+    y = X.pop("Class")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
+    clf_list = [
+        ("dec_tree", DecisionTreeClassifier(random_state=42)),
+        ("log_reg", LogisticRegression()),
+        ("knn", KNeighborsClassifier()),
+        ("naive_bayes", GaussianNB()),
+    ]
+
+    for model_tuple in clf_list:
+        model = model_tuple[1]
+        if "random_state" in model.get_params().keys():
+            model.set_params(random_state=42)
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        recall = metrics.recall_score(y_pred, y_test)
+        print(f"{model_tuple[0]}'s recall score: {recall:.4f}")
+
+    lr = LogisticRegression()
+    stack_clf = StackingClassifier(clf_list, final_estimator=lr, cv=k_fold, n_jobs=-1)
+    stack_clf.fit(X_train, y_train)
+    y_pred = stack_clf.predict(X_test)
+    recall = metrics.recall_score(y_pred, y_test)
+    print(f"The stacked ensemble's recall score: {recall:.4f}")
+
+
+## Investigating different approaches to handling imbalanced data
+def different_approaches():
+    df = pd.read_csv("data/credit_card_fraud.csv")
+    X = df.copy()
+    y = X.pop("Class")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+    ic(y.value_counts(normalize=True))
+
+    rf = RandomForestClassifier(random_state=42, n_jobs=-1)
+    rf.fit(X_train, y_train)
+    rf_perf = performance_evaluation_report(rf, X_test, y_test, show_plot=True, show_pr_curve=True)
+    ic(rf_perf)
+
+    rus = RandomUnderSampler(random_state=42)
+    X_rus, y_rus = rus.fit_resample(X_train, y_train)
+    print(f"The new class proportions are: {dict(Counter(y_rus))}")
+    rf.fit(X_rus, y_rus)
+    rf_rus_perf = performance_evaluation_report(
+        rf, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+    ic(rf_rus_perf)
+
+    ros = RandomOverSampler(random_state=42)
+    X_ros, y_ros = ros.fit_resample(X_train, y_train)
+    print(f"The new class proportions are: {dict(Counter(y_ros))}")
+    rf.fit(X_ros, y_ros)
+    rf_ros_perf = performance_evaluation_report(
+        rf, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+    ic(rf_ros_perf)
+
+    X_smote, y_smote = SMOTE(random_state=42).fit_resample(X_train, y_train)
+    print(f"The new class proportions are: {dict(Counter(y_smote))}")
+    rf.fit(X_smote, y_smote)
+    rf_smote_perf = performance_evaluation_report(
+        rf, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+    ic(rf_smote_perf)
+
+    X_adasyn, y_adasyn = ADASYN(random_state=42).fit_resample(X_train, y_train)
+    print(f"The new class proportions are: {dict(Counter(y_adasyn))}")
+    rf.fit(X_adasyn, y_adasyn)
+    rf_adasyn_perf = performance_evaluation_report(
+        rf, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+    ic(rf_adasyn_perf)
+
+    rf_cw = RandomForestClassifier(random_state=42, class_weight="balanced", n_jobs=-1)
+    rf_cw.fit(X_train, y_train)
+    rf_cw_perf = performance_evaluation_report(
+        rf_cw, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+    ic(rf_cw_perf)
+
+    balanced_rf = BalancedRandomForestClassifier(random_state=42)
+    balanced_rf.fit(X_train, y_train)
+    balanced_rf_perf = performance_evaluation_report(
+        balanced_rf, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+
+    balanced_rf_cw = BalancedRandomForestClassifier(
+        random_state=42, class_weight="balanced", n_jobs=-1
+    )
+    balanced_rf_cw.fit(X_train, y_train)
+    balanced_rf_cw_perf = performance_evaluation_report(
+        balanced_rf_cw, X_test, y_test, show_plot=True, show_pr_curve=True
+    )
+
+    performance_results = {
+        "random_forest": rf_perf,
+        "undersampled rf": rf_rus_perf,
+        "oversampled_rf": rf_ros_perf,
+        "smote": rf_smote_perf,
+        "adasyn": rf_adasyn_perf,
+        "random_forest_cw": rf_cw_perf,
+        "balanced_random_forest": balanced_rf_perf,
+        "balanced_random_forest_cw": balanced_rf_cw_perf,
+    }
+    results = pd.DataFrame(performance_results).T
+    results.to_csv("data/performance_results.csv")
+    ic(results)
+
 
 if __name__ == "__main__":
-    advanced_classifiers(nsearch=2)
+    # advanced_classifiers(nsearch=2)
+    # stacking_improved()
+    different_approaches()
 
-    #
-    # # ## Using stacking for improved performance
-    #
-    # # ### Getting ready
-    #
-    # # Make sure you are using `scikit-learn` 0.22 and above for this recipe.
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[ ]:
-    #
-    #
-    # import pandas as pd
-    # from sklearn.model_selection import (train_test_split,
-    #                                      StratifiedKFold)
-    # from sklearn import metrics
-    # from sklearn.preprocessing import StandardScaler
-    #
-    # from sklearn.naive_bayes import GaussianNB
-    # from sklearn.neighbors import KNeighborsClassifier
-    # from sklearn.tree import DecisionTreeClassifier
-    # from sklearn.ensemble import StackingClassifier
-    # from sklearn.linear_model import LogisticRegression
-    #
-    #
-    # # 2. Load and preprocess data:
-    #
-    # # In[8]:
-    #
-    #
-    # RANDOM_STATE = 42
-    #
-    # k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
-    #
-    # df = pd.read_csv('../Datasets/credit_card_fraud.csv')
-    #
-    # X = df.copy()
-    # y = X.pop('Class')
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     stratify=y,
-    #                                                     random_state=RANDOM_STATE)
-    #
-    # scaler = StandardScaler()
-    # X_train = scaler.fit_transform(X_train)
-    # X_test = scaler.transform(X_test)
-    #
-    #
-    # # 3. Define a list of classifiers to consider:
-    #
-    # # In[9]:
-    #
-    #
-    # clf_list = [('dec_tree', DecisionTreeClassifier(random_state=RANDOM_STATE)),
-    #             ('log_reg', LogisticRegression()),
-    #             ('knn', KNeighborsClassifier()),
-    #             ('naive_bayes', GaussianNB())]
-    #
-    #
-    # # 4. Iterate over the selected models, fit them to the data and calculate recall using the test set:
-    #
-    # # In[10]:
-    #
-    #
-    # for model_tuple in clf_list:
-    #     model = model_tuple[1]
-    #     if 'random_state' in model.get_params().keys():
-    #         model.set_params(random_state=RANDOM_STATE)
-    #     model.fit(X_train, y_train)
-    #     y_pred = model.predict(X_test)
-    #     recall = metrics.recall_score(y_pred, y_test)
-    #     print(f"{model_tuple[0]}'s recall score: {recall:.4f}")
-    #
-    #
-    # # 5. Define and fit the stacking classifier:
-    #
-    # # In[11]:
-    #
-    #
-    # lr = LogisticRegression()
-    # stack_clf = StackingClassifier(clf_list,
-    #                                final_estimator=lr,
-    #                                cv=k_fold,
-    #                                n_jobs=-1)
-    # stack_clf.fit(X_train, y_train)
-    #
-    #
-    # # 6. Create predictions and evaluate the stacked ensemble:
-    #
-    # # In[12]:
-    #
-    #
-    # y_pred = stacking_clf.predict(X_test)
-    # recall = metrics.recall_score(y_pred, y_test)
-    # print(f"The stacked ensemble's recall score: {recall:.4f}")
-    #
-    #
-    # # ## Investigating the feature importance
-    #
-    # # ### Getting Ready
-    #
-    # # Please run the code for the *Investigating advanced classifiers* recipe before this one (you do not need to run the *There's more* section).
-    # #
-    # # This recipe requires `scikit-learn` version `0.22`.
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[9]:
-    #
-    #
-    # # from sklearn.inspection import permutation_importance
-    # from sklearn.base import clone
-    # from eli5.sklearn import PermutationImportance
-    #
-    #
-    # # 2. Extract the classifier and preprocessor from the pipeline:
-    #
-    # # In[10]:
-    #
-    #
-    # # in case we have the fitted grid search object `rf_rs`, we extract the best pipeline
-    # # rf_pipeline = rf_rs.best_estimator_
-    #
-    # rf_classifier = rf_pipeline.named_steps['classifier']
-    # preprocessor = rf_pipeline.named_steps['preprocessor']
-    #
-    # # in case we want to manually assign hyperparameters based on previous grid search
-    # # best_parameters =  {'n_estimators': 400, 'min_samples_split': 2,
-    # #                     'min_samples_leaf': 49, 'max_features': None,
-    # #                     'max_depth': 20, 'bootstrap': True, 'random_state': 42}
-    # # rf_classifier = rf_classifier.set_params(**best_parameters)
-    #
-    #
-    # # 3. Recover feature names from the preprocessing transformer and transform the training data:
-    #
-    # # In[11]:
-    #
-    #
-    # feat_names = preprocessor.named_transformers_['categorical']                          .named_steps['onehot']                          .get_feature_names(
-    #     input_features=cat_features
-    # )
-    # feat_names = np.r_[num_features, feat_names]
-    #
-    # X_train_preprocessed = pd.DataFrame(
-    #     preprocessor.transform(X_train),
-    #     columns=feat_names
-    # )
-    #
-    #
-    # # 4. Extract the default feature importance and calculate the cumulative importance:
-    #
-    # # In[12]:
-    #
-    #
-    # rf_feat_imp = pd.DataFrame(rf_classifier.feature_importances_,
-    #                            index=feat_names,
-    #                            columns=['mdi'])
-    # rf_feat_imp = rf_feat_imp.sort_values('mdi', ascending=False)
-    # rf_feat_imp['cumul_importance_mdi'] = np.cumsum(rf_feat_imp.mdi)
-    #
-    #
-    # # 5. Define a function for plotting top X features in terms of their importance:
-    #
-    # # In[28]:
-    #
-    #
-    # def plot_most_important_features(feat_imp, method='MDI',
-    #                                  n_features=10, bottom=False):
-    #     '''
-    #     Function for plotting the top/bottom x features in terms of their importance.
-    #
-    #     Parameters
-    #     ----------
-    #     feat_imp : pd.Series
-    #         A pd.Series with calculated feature importances
-    #     method : str
-    #         A string representing the method of calculating the importances.
-    #         Used for the title of the plot.
-    #     n_features : int
-    #         Number of top/bottom features to plot
-    #     bottom : boolean
-    #         Indicates if the plot should contain the bottom feature importances.
-    #
-    #     Returns
-    #     -------
-    #     ax : matplotlib.axes._subplots.AxesSubplot
-    #         Ax cointaining the plot
-    #     '''
-    #
-    #     if bottom:
-    #         indicator = 'Bottom'
-    #         feat_imp = feat_imp.sort_values(ascending=True)
-    #     else:
-    #         indicator = 'Top'
-    #         feat_imp = feat_imp.sort_values(ascending=False)
-    #
-    #     ax = feat_imp.head(n_features).plot.barh()
-    #     ax.invert_yaxis()
-    #     ax.set(title=('Feature importance - '
-    #                   f'{method} ({indicator} {n_features})'),
-    #            xlabel='Importance',
-    #            ylabel='Feature')
-    #
-    #     return ax
-    #
-    #
-    # # In[29]:
-    #
-    #
-    # plot_most_important_features(rf_feat_imp.mdi,
-    #                              method='MDI')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im7.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # 6. Plot the cumulative importance of the features:
-    #
-    # # In[32]:
-    #
-    #
-    # x_values = range(len(feat_names))
-    #
-    # fig, ax = plt.subplots()
-    #
-    # ax.plot(x_values, rf_feat_imp.cumul_importance_mdi, 'b-')
-    # ax.hlines(y = 0.95, xmin=0, xmax=len(x_values),
-    #           color = 'g', linestyles = 'dashed')
-    # ax.set(title='Cumulative Importances',
-    #        xlabel='Variable',
-    #        ylabel='Importance')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im8.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # In[33]:
-    #
-    #
-    # print(f'Top 10 features account for {100 * rf_feat_imp.head(10).mdi.sum():.2f}% of the total importance.')
-    # print(f'Top {rf_feat_imp[rf_feat_imp.cumul_importance_mdi <= 0.95].shape[0]} features account for 95% of importance.')
-    #
-    #
-    # # 7. Calculate and plot permutation importance:
-    #
-    # # In[34]:
-    #
-    #
-    # perm = PermutationImportance(rf_classifier, n_iter = 25,
-    #                              random_state=42)
-    # perm.fit(X_train_preprocessed, y_train)
-    # rf_feat_imp['permutation'] = perm.feature_importances_
-    #
-    #
-    # # In[35]:
-    #
-    #
-    # plot_most_important_features(rf_feat_imp.permutation,
-    #                              method='Permutation')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im9.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # 8. Define a function for calculating the drop-column feature importance:
-    #
-    # # In[36]:
-    #
-    #
-    # def drop_col_feat_imp(model, X, y, random_state = 42):
-    #     '''
-    #     Function for calculating the drop column feature importance.
-    #
-    #     Parameters
-    #     ----------
-    #     model : scikit-learn's model
-    #         Object representing the estimator with selected hyperparameters.
-    #     X : pd.DataFrame
-    #         Features for training the model
-    #     y : pd.Series
-    #         The target
-    #     random_state : int
-    #         Random state for reproducibility
-    #
-    #     Returns
-    #     -------
-    #     importances : list
-    #         List containing the calculated feature importances in the order of appearing in X
-    #
-    #     '''
-    #
-    #     model_clone = clone(model)
-    #     model_clone.random_state = random_state
-    #     model_clone.fit(X, y)
-    #     benchmark_score = model_clone.score(X, y)
-    #
-    #     importances = []
-    #
-    #     for col in X.columns:
-    #         model_clone = clone(model)
-    #         model_clone.random_state = random_state
-    #         model_clone.fit(X.drop(col, axis = 1), y)
-    #         drop_col_score = model_clone.score(X.drop(col, axis = 1),
-    #                                            y)
-    #         importances.append(benchmark_score - drop_col_score)
-    #
-    #     return importances
-    #
-    #
-    # # 9. Calculate and plot the drop-column feature importance:
-    #
-    # # In[39]:
-    #
-    #
-    # rf_feat_imp['drop_column'] = drop_col_feat_imp(
-    #     rf_classifier,
-    #     X_train_preprocessed,
-    #     y_train,
-    #     random_state = 42
-    # )
-    #
-    #
-    # # In[40]:
-    #
-    #
-    # plot_most_important_features(rf_feat_imp.drop_column,
-    #                              method='Drop column')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im10.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # In[41]:
-    #
-    #
-    # plot_most_important_features(rf_feat_imp.drop_column,
-    #                              method='Drop column',
-    #                              bottom=True)
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im11.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # ## Investigating different approaches to handling imbalanced data
-    #
-    # # ### How to do it...
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[23]:
-    #
-    #
-    # import pandas as pd
-    # import seaborn as sns
-    # from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
-    # from imblearn.under_sampling import RandomUnderSampler
-    # from sklearn.model_selection import train_test_split
-    # from sklearn.ensemble import RandomForestClassifier
-    # from collections import Counter
-    # from chapter_9_utils import performance_evaluation_report
-    #
-    #
-    # # 2. Load and prepare data:
-    #
-    # # In[24]:
-    #
-    #
-    # df = pd.read_csv('../Datasets/credit_card_fraud.csv')
-    #
-    # X = df.copy()
-    # y = X.pop('Class')
-    #
-    # RANDOM_STATE = 42
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     stratify=y,
-    #                                                     random_state=RANDOM_STATE)
-    #
-    #
-    # # In[25]:
-    #
-    #
-    # y.value_counts(normalize=True)
-    #
-    #
-    # # 3. Train the baseline model:
-    #
-    # # In[26]:
-    #
-    #
-    # rf = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1)
-    # rf.fit(X_train, y_train)
-    #
-    #
-    # # In[27]:
-    #
-    #
-    # rf_perf = performance_evaluation_report(rf, X_test, y_test,
-    #                                         show_plot=True,
-    #                                         show_pr_curve=True)
-    #
-    #
-    # # In[28]:
-    #
-    #
-    # rf_perf
-    #
-    #
-    # # 4. Undersample the data and train a Random Forest Classifier:
-    #
-    # # In[29]:
-    #
-    #
-    # rus = RandomUnderSampler(random_state=RANDOM_STATE)
-    # X_rus, y_rus = rus.fit_resample(X_train, y_train)
-    # print(f'The new class proportions are: {dict(Counter(y_rus))}')
-    #
-    # rf.fit(X_rus, y_rus)
-    # rf_rus_perf = performance_evaluation_report(rf, X_test, y_test,
-    #                                             show_plot=True,
-    #                                             show_pr_curve=True)
-    #
-    #
-    # # In[30]:
-    #
-    #
-    # rf_rus_perf
-    #
-    #
-    # # 5. Oversample the data and train a Random Forest Classifier:
-    #
-    # # In[31]:
-    #
-    #
-    # ros = RandomOverSampler(random_state=RANDOM_STATE)
-    # X_ros, y_ros = ros.fit_resample(X_train, y_train)
-    # print(f'The new class proportions are: {dict(Counter(y_ros))}')
-    #
-    # rf.fit(X_ros, y_ros)
-    # rf_ros_perf = performance_evaluation_report(rf, X_test, y_test,
-    #                                             show_plot=True,
-    #                                             show_pr_curve=True)
-    #
-    #
-    # # In[32]:
-    #
-    #
-    # rf_ros_perf
-    #
-    #
-    # # 6. Oversample using SMOTE:
-    #
-    # # In[33]:
-    #
-    #
-    # X_smote, y_smote = SMOTE(random_state=RANDOM_STATE).fit_resample(X_train, y_train)
-    # print(f'The new class proportions are: {dict(Counter(y_smote))}')
-    # rf.fit(X_smote, y_smote)
-    # rf_smote_perf = performance_evaluation_report(rf, X_test, y_test,
-    #                                               show_plot=True,
-    #                                               show_pr_curve=True)
-    #
-    #
-    # # In[34]:
-    #
-    #
-    # rf_smote_perf
-    #
-    #
-    # # 7. Oversample using ADASYN:
-    #
-    # # In[35]:
-    #
-    #
-    # X_adasyn, y_adasyn = ADASYN(random_state=RANDOM_STATE).fit_resample(X_train, y_train)
-    # print(f'The new class proportions are: {dict(Counter(y_adasyn))}')
-    # rf.fit(X_adasyn, y_adasyn)
-    # rf_adasyn_perf = performance_evaluation_report(rf, X_test, y_test,
-    #                                                show_plot=True,
-    #                                                show_pr_curve=True)
-    #
-    #
-    # # In[36]:
-    #
-    #
-    # rf_adasyn_perf
-    #
-    #
-    # # 8. Use sample weights in the Random Forest Classifier:
-    #
-    # # In[37]:
-    #
-    #
-    # rf_cw = RandomForestClassifier(random_state=RANDOM_STATE,
-    #                                class_weight='balanced',
-    #                                n_jobs=-1)
-    # rf_cw.fit(X_train, y_train)
-    # rf_cw_perf = performance_evaluation_report(rf_cw, X_test, y_test,
-    #                                            show_plot=True,
-    #                                            show_pr_curve=True)
-    #
-    #
-    # # In[38]:
-    #
-    #
-    # rf_cw_perf
-    #
-    #
-    # # ### There's more
-    #
-    # # 1. Import the library:
-    #
-    # # In[39]:
-    #
-    #
-    # from imblearn.ensemble import BalancedRandomForestClassifier
-    #
-    #
-    # # 2. Train the `BalancedRandomForestClassifier`:
-    #
-    # # In[40]:
-    #
-    #
-    # balanced_rf = BalancedRandomForestClassifier(
-    #     random_state=RANDOM_STATE
-    # )
-    #
-    # balanced_rf.fit(X_train, y_train)
-    # balanced_rf_perf = performance_evaluation_report(balanced_rf,
-    #                                                  X_test, y_test,
-    #                                                  show_plot=True,
-    #                                                  show_pr_curve=True)
-    #
-    #
-    # # 3. Train the `BalancedRandomForestClassifier` with balanced classes:
-    #
-    # # In[41]:
-    #
-    #
-    # balanced_rf_cw = BalancedRandomForestClassifier(
-    #     random_state=RANDOM_STATE,
-    #     class_weight='balanced',
-    #     n_jobs=-1
-    # )
-    #
-    # balanced_rf_cw.fit(X_train, y_train)
-    # balanced_rf_cw_perf = performance_evaluation_report(balanced_rf_cw,
-    #                                                     X_test, y_test,
-    #                                                     show_plot=True,
-    #                                                     show_pr_curve=True)
-    #
-    #
-    # # 4. Group the performance results into a DataFrame:
-    #
-    # # In[42]:
-    #
-    #
-    # performance_results = {'random_forest': rf_perf,
-    #                        'undersampled rf': rf_rus_perf,
-    #                        'oversampled_rf': rf_ros_perf,
-    #                        'smote': rf_smote_perf,
-    #                        'adasyn': rf_adasyn_perf,
-    #                        'random_forest_cw': rf_cw_perf,
-    #                        'balanced_random_forest': balanced_rf_perf,
-    #                        'balanced_random_forest_cw': balanced_rf_cw_perf}
-    # pd.DataFrame(performance_results).T
-    #
-    #
     # # ## Bayesian Hyperparameter Optimization
     #
     # # ### How to do it...
@@ -1015,10 +699,10 @@ if __name__ == "__main__":
     # def objective(params, n_folds = N_FOLDS, random_state=42):
     #
     #     model = LGBMClassifier(**params)
-    #     model.set_params(random_state=random_state)
+    #     model.set_params(random_state=42)
     #
     #     k_fold = StratifiedKFold(n_folds, shuffle=True,
-    #                              random_state=random_state)
+    #                              random_state=42)
     #
     #     metrics = cross_val_score(model, X_train, y_train,
     #                               cv=k_fold, scoring='recall')
