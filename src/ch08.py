@@ -32,6 +32,7 @@ from sklearn.model_selection import (
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
+
 from datetime import date, datetime
 from dotenv import load_dotenv
 from icecream import ic
@@ -48,7 +49,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # in the case of the `RandomForestClassifier`, the default setting of `n_estimators`
 # was changed from 10 to 100. This will cause discrepancies with the results presented in the book.
 
-# ## BONUS: Getting the data and preparing for book
+## BONUS: Getting the data and preparing for book
 # This is a part not covered in the book. We download the considered dataset
 # from the website of the [UC Irvine Machine Learning Repository]
 # (https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients).
@@ -66,6 +67,64 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # to significantly change the underlying structure/patterns in the data.
 # downloading the data
 # !wget https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls
+
+
+def prepare_csv_missing():
+    df = pd.read_excel("data/default of credit card clients.xlsx", skiprows=1, index_col=0)
+    df.columns = df.columns.str.lower().str.replace(" ", "_")
+    ic(df.head())
+
+    months = ["sep", "aug", "jul", "jun", "may", "apr"]
+    variables = ["payment_status", "bill_statement", "previous_payment"]
+    new_column_names = [x + "_" + y for x in variables for y in months]
+    rename_dict = {x: y for x, y in zip(df.loc[:, "pay_0":"pay_amt6"].columns, new_column_names)}
+    df.rename(columns=rename_dict, inplace=True)
+    ic(df.sex.value_counts())
+    ic(df.education.value_counts(sort=True).index.sort_values(ascending=True))
+    ic(df.marriage.value_counts())
+    ic(df.age.describe(include="all"))
+
+    # creating dicts to map number to strings
+    gender_dict = {1: "Male", 2: "Female"}
+    education_dict = {
+        0: "Others",
+        1: "Graduate school",
+        2: "University",
+        3: "High school",
+        4: "Others",
+        5: "Others",
+        6: "Others",
+    }
+    marital_status_dict = {0: "Others", 1: "Married", 2: "Single", 3: "Others"}
+    payment_status = {
+        -2: "Unknown",
+        -1: "Payed duly",
+        0: "Unknown",
+        1: "Payment delayed 1 month",
+        2: "Payment delayed 2 months",
+        3: "Payment delayed 3 months",
+        4: "Payment delayed 4 months",
+        5: "Payment delayed 5 months",
+        6: "Payment delayed 6 months",
+        7: "Payment delayed 7 months",
+        8: "Payment delayed 8 months",
+        9: "Payment delayed >= 9 months",
+    }
+
+    # # map numbers to strings
+    df.sex = df.sex.map(gender_dict)
+    df.education = df.education.map(education_dict)
+    df.marriage = df.marriage.map(marital_status_dict)
+    for column in [x for x in df.columns if ("status" in x)]:
+        df[column] = df[column].map(payment_status)
+
+    # define the ratio of missing values to introduce
+    RATIO_MISSING = 0.005
+    random_state = np.random.RandomState(42)
+    for column in ["sex", "education", "marriage", "age"]:
+        df.loc[df.sample(frac=RATIO_MISSING, random_state=random_state).index, column] = ""
+    df.reset_index(drop=True, inplace=True)
+    df.to_csv("data/credit_card_default.csv")
 
 
 def performance_evaluation_report(
@@ -163,65 +222,8 @@ def performance_evaluation_report(
     return stats
 
 
-if __name__ == "__main__":
-    df = pd.read_excel("data/default of credit card clients.xlsx", skiprows=1, index_col=0)
-    df.columns = df.columns.str.lower().str.replace(" ", "_")
-
-    months = ["sep", "aug", "jul", "jun", "may", "apr"]
-    variables = ["payment_status", "bill_statement", "previous_payment"]
-    new_column_names = [x + "_" + y for x in variables for y in months]
-    rename_dict = {x: y for x, y in zip(df.loc[:, "pay_0":"pay_amt6"].columns, new_column_names)}
-    df.rename(columns=rename_dict, inplace=True)
-
-    # creating dicts to map number to strings
-    gender_dict = {1: "Male", 2: "Female"}
-    education_dict = {
-        0: "Others",
-        1: "Graduate school",
-        2: "University",
-        3: "High school",
-        4: "Others",
-        5: "Others",
-        6: "Others",
-    }
-    marital_status_dict = {0: "Others", 1: "Married", 2: "Single", 3: "Others"}
-    payment_status = {
-        -2: "Unknown",
-        -1: "Payed duly",
-        0: "Unknown",
-        1: "Payment delayed 1 month",
-        2: "Payment delayed 2 months",
-        3: "Payment delayed 3 months",
-        4: "Payment delayed 4 months",
-        5: "Payment delayed 5 months",
-        6: "Payment delayed 6 months",
-        7: "Payment delayed 7 months",
-        8: "Payment delayed 8 months",
-        9: "Payment delayed >= 9 months",
-    }
-
-    # # map numbers to strings
-    df.sex = df.sex.map(gender_dict)
-    df.education = df.education.map(education_dict)
-    df.marriage = df.marriage.map(marital_status_dict)
-    for column in [x for x in df.columns if ("status" in x)]:
-        df[column] = df[column].map(payment_status)
-
-    # define the ratio of missing values to introduce
-    RATIO_MISSING = 0.005
-    random_state = np.random.RandomState(42)
-    for column in ["sex", "education", "marriage", "age"]:
-        df.loc[df.sample(frac=RATIO_MISSING, random_state=random_state).index, column] = ""
-    df.reset_index(drop=True, inplace=True)
-    df.to_csv("data/credit_card_default.csv")
-
-    df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
+def exploratory_data_analysis(df):
     print(f"The DataFrame has {len(df)} rows and {df.shape[1]} columns.")
-    ic(df.head())
-
-    X = df.copy()
-    y = X.pop("default_payment_next_month")
-    ic(df.dtypes)
 
     def get_df_memory_usage(df, top_columns=5):
         """
@@ -262,11 +264,14 @@ if __name__ == "__main__":
     df_cat2 = pd.read_csv(
         "data/credit_card_default.csv", index_col=0, na_values="", dtype=column_dtypes
     )
-    get_df_memory_usage(df_cat2)
-    df_cat.equals(df_cat2)
 
-    df.describe().transpose().round(2)
-    df.describe(include="object").transpose()
+    get_df_memory_usage(df_cat2)
+
+    ic(df_cat.equals(df_cat2))
+    ic(df.describe(include="number").transpose().round(2))
+    ic(df.describe(include="object").T)
+    ic(df.isna().any().any())
+    ic(df.isna().sum())
 
     fig, ax = plt.subplots()
     sns.distplot(
@@ -291,10 +296,11 @@ if __name__ == "__main__":
     plt.savefig("images/ch8_im5.png")
 
     # As mentioned in the text, we can create a histogram (together with the KDE), by calling:
-    ax = sns.distplot(
-        df.age.dropna(),
-    )
+    ax = sns.distplot(df.age.dropna(), hist=True)
     ax.set_title("Distribution of age")
+    plt.tight_layout()
+    plt.savefig("images/ch8_im51.png", bbox_inches="tight")
+
     # We noticed some spikes appearing every ~10 years and the reason for this is the binning.
     # Below, we created the same histogram using `sns.countplot` and `plotly_express`. By doing so,
     # each value of age has a separate bin and we can inspect the plot in detail.
@@ -307,17 +313,18 @@ if __name__ == "__main__":
         else:
             label.set_visible(False)
     px.histogram(df, x="age", title="Distribution of age")
+    plt.savefig("images/ch8_im52.png", bbox_inches="tight")
 
     pair_plot = sns.pairplot(df[["age", "limit_bal", "previous_payment_sep"]])
     pair_plot.fig.suptitle("Pairplot of selected variables", y=1.05)
-    plt.tight_layout()
     plt.savefig("images/ch8_im6.png", bbox_inches="tight")
 
     # Additionally, we can separate the genders by specifying the `hue` argument:
-    pair_plot = sns.pairplot(df[["sex", "age", "limit_bal", "previous_payment_sep"]], hue="sex")
+    pair_plot = sns.pairplot(
+        df[["sex", "age", "limit_bal", "previous_payment_sep"]], hue="sex", diag_kind="hist"
+    )
     pair_plot.fig.suptitle("Pairplot of selected variables", y=1.05)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im6_1.png")
+    plt.savefig("images/ch8_im6_1.png", bbox_inches="tight")
 
     def plot_correlation_matrix(corr_mat):
         """
@@ -354,31 +361,26 @@ if __name__ == "__main__":
 
     corr_mat = df.select_dtypes(include="number").corr()
     plot_correlation_matrix(corr_mat)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im7.png")
+    plt.savefig("images/ch8_im7.png", bbox_inches="tight")
 
     # We can also directly inspect the correlation between the features (numerical) and the target:
     ic(df.select_dtypes(include="number").corr()[["default_payment_next_month"]])
 
     # 7. Plot the distribution of limit balance for each gender and education level:
+    plt.clf()
     ax = sns.violinplot(x="education", y="limit_bal", hue="sex", split=True, data=df)
     ax.set_title("Distribution of limit balance per education level", fontsize=16)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im8.png")
-    plt.close()
+    plt.savefig("images/ch8_im8.png", bbox_inches="tight")
 
     # The following code plots the same information, without splitting the violin plots.
     ax = sns.violinplot(x="education", y="limit_bal", hue="sex", data=df)
     ax.set_title("Distribution of limit balance per education level", fontsize=16)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im81.png")
-    plt.close()
+    plt.savefig("images/ch8_im81.png", bbox_inches="tight")
 
     # 8. Investigate the distribution of the target variable per gender and education level:
     ax = sns.countplot("default_payment_next_month", hue="sex", data=df, orient="h")
     ax.set_title("Distribution of the target variable", fontsize=16)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im9.png")
+    plt.savefig("images/ch8_im9.png", bbox_inches="tight")
 
     # 9. Investigate the percentage of defaults per education level:
     ax = (
@@ -389,23 +391,29 @@ if __name__ == "__main__":
     )
     ax.set_title("Percentage of default per education level", fontsize=16)
     ax.legend(title="Default", bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-    plt.savefig("images/ch8_im10.png")
+    plt.savefig("images/ch8_im10.png", bbox_inches="tight")
     plt.close()
 
-    ic(df.profile_report())
+    # profile = df.profile_report()
+    # profile.to_file("data/profile.html")
+
+
+def split_datasets(df):
+    X = df.copy()
+    y = X.pop("default_payment_next_month")
+    ic(df.dtypes)
 
     ## Splitting the data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    # 3. Split the data into training and test sets without shuffling:
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-    # 4. Split the data into training and test sets with stratification:
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=42
-    )
-    # 5. Verify that the ratio of the target is preserved:
-    y_train.value_counts(normalize=True)
-    y_test.value_counts(normalize=True)
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # # 3. Split the data into training and test sets without shuffling:
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    # # 4. Split the data into training and test sets with stratification:
+    # X_train, X_test, y_train, y_test = train_test_split(
+    #     X, y, test_size=0.2, stratify=y, random_state=42
+    # )
+    # # 5. Verify that the ratio of the target is preserved:
+    # y_train.value_counts(normalize=True)
+    # y_test.value_counts(normalize=True)
 
     # define the size of the validation and test sets
     VALID_SIZE = 0.1
@@ -423,7 +431,6 @@ if __name__ == "__main__":
     )
     #
     ## Dealing with missing values
-    X.info()
     missingno.matrix(X)
     plt.savefig("images/ch8_im12.png")
 
@@ -455,13 +462,16 @@ if __name__ == "__main__":
         X_test.loc[:, col] = cat_imputer.transform(X_test[[col]])
 
     # alternative method using pandas
-    # for feature in CAT_FEATURES:
+    for feature in CAT_FEATURES:
+        ic(X_train[feature].mode().values[0])
     #     mode_value = X_train[feature].mode().values[0]
     #     X_train.loc[:, feature].fillna(mode_value, inplace=True)
     #     X_test.loc[:, feature].fillna(mode_value, inplace=True)
 
     # 7. Verify that there are no missing values:
-    X_train.info()
+    # X_train.info()
+    ic(X_train.isna().any().any())
+    ic(X_train.isna().sum())
 
     ## Encoding categorical variables
     # 2. Use Label Encoder to encode a selected column:
@@ -496,7 +506,7 @@ if __name__ == "__main__":
     X_test_ohe = pd.concat([X_test, X_test_cat], axis=1).drop(CAT_FEATURES, axis=1)
 
     #### Using `pandas.get_dummies` for one-hot encoding
-    pd.get_dummies(X_train, prefix_sep="_", drop_first=True)
+    ic(pd.get_dummies(X_train, prefix_sep="_", drop_first=True))
 
     #### Specifying possible categories for OneHotEncoder
     one_hot_encoder = OneHotEncoder(
@@ -507,13 +517,13 @@ if __name__ == "__main__":
     )
     one_hot_transformer = ColumnTransformer([("one_hot", one_hot_encoder, ["sex"])])
     one_hot_transformer.fit(X_train)
-    one_hot_transformer.get_feature_names()
+    ic(one_hot_transformer.get_feature_names())
 
     #### Category Encoders library
     one_hot_encoder_ce = ce.OneHotEncoder(use_cat_names=True)
     one_hot_encoder_ce.fit(X_train)
     X_train_ce = one_hot_encoder_ce.transform(X_train)
-    X_train_ce.head()
+    ic(X_train_ce.head())
 
     target_encoder = ce.TargetEncoder(smoothing=0)
     target_encoder.fit(X_train.sex, y_train)
@@ -523,14 +533,13 @@ if __name__ == "__main__":
     tree_classifier = DecisionTreeClassifier(random_state=42)
     tree_classifier.fit(X_train_ohe, y_train)
     y_pred = tree_classifier.predict(X_test_ohe)
+    ic(y_pred)
 
     LABELS = ["No Default", "Default"]
     tree_perf = performance_evaluation_report(
         tree_classifier, X_test_ohe, y_test, labels=LABELS, show_plot=True
     )
-
-    plt.tight_layout()
-    plt.savefig("images/ch8_im14.png")
+    plt.savefig("images/ch8_im14.png", bbox_inches="tight")
     ic(tree_perf)
 
     # 4. Plot the simplified Decision Tree:
@@ -549,21 +558,22 @@ if __name__ == "__main__":
     )
     tree_graph = pydotplus.graph_from_dot_data(tree_dot.getvalue())
     tree_graph.set_dpi(300)
-    # tree_graph.write_png('images/ch8_im15.png')
-    Image(value=tree_graph.create_png())
+    tree_graph.write_png("images/ch8_im15.png")
+    # Image(value=tree_graph.create_png())
 
     y_pred_prob = tree_classifier.predict_proba(X_test_ohe)[:, 1]
     precision, recall, thresholds = metrics.precision_recall_curve(y_test, y_pred_prob)
 
+    plt.clf()
     ax = plt.subplot()
     ax.plot(recall, precision, label=f"PR-AUC = {metrics.auc(recall, precision):.2f}")
     ax.set(title="Precision-Recall Curve", xlabel="Recall", ylabel="Precision")
     ax.legend()
-    plt.tight_layout()
-    plt.savefig("images/ch8_im16.png")
+    plt.savefig("images/ch8_im16.png", bbox_inches="tight")
 
-    ## Implementing scikit-learn's pipelines
-    df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
+
+## Implementing scikit-learn's pipelines
+def sci_pipelines(df):
     X = df.copy()
     y = X.pop("default_payment_next_month")
 
@@ -574,17 +584,16 @@ if __name__ == "__main__":
     cat_features = X_train.select_dtypes(include="object").columns.to_list()
 
     # 4. Define the numerical pipeline:
-    num_pipeline = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
     cat_list = [list(X_train[col].dropna().unique()) for col in cat_features]
+    one_hot_encoder = OneHotEncoder(
+        categories=cat_list, sparse=False, handle_unknown="error", drop="first"
+    )
+
+    num_pipeline = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
     cat_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="most_frequent")),
-            (
-                "onehot",
-                OneHotEncoder(
-                    categories=cat_list, sparse=False, handle_unknown="error", drop="first"
-                ),
-            ),
+            ("onehot", one_hot_encoder),
         ]
     )
     # 6. Define the column transformer object:
@@ -604,9 +613,7 @@ if __name__ == "__main__":
         tree_pipeline, X_test, y_test, labels=LABELS, show_plot=True
     )
     ic(tree_perf)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im17.png")
-    plt.close()
+    plt.savefig("images/ch8_im17.png", bbox_inches="tight")
 
     class OutlierRemover(BaseEstimator, TransformerMixin):
         def __init__(self, n_std=3):
@@ -617,10 +624,7 @@ if __name__ == "__main__":
 
         def fit(self, X, y=None):
             if np.isnan(X).any(axis=None):
-                raise ValueError(
-                    """There are missing values in the array!
-                                    Please remove them."""
-                )
+                raise ValueError("There are missing values in the array! Please remove them.")
             mean_vec = np.mean(X, axis=0)
             std_vec = np.std(X, axis=0)
             self.lower_band_ = mean_vec - self.n_std * std_vec
@@ -658,28 +662,42 @@ if __name__ == "__main__":
         tree_pipeline, X_test, y_test, labels=LABELS, show_plot=True
     )
     ic(tree_perf)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im18.png")
+    plt.savefig("images/ch8_im18.png", bbox_inches="tight")
 
-    ## Tuning hyperparameters using grid search and cross-validation
-    k_fold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
-    cross_val_score(tree_pipeline, X_train, y_train, cv=k_fold)
-    cross_validate(
-        tree_pipeline,
-        X_train,
-        y_train,
-        cv=k_fold,
-        scoring=["accuracy", "precision", "recall", "roc_auc"],
+    return tree_pipeline
+
+
+## Tuning hyperparameters using grid search and cross-validation
+def tuning_parameters(pipeline):
+    X = df.copy()
+    y = X.pop("default_payment_next_month")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
     )
+
+    k_fold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    ic(cross_val_score(pipeline, X_train, y_train, cv=k_fold))
+    ic(
+        cross_validate(
+            pipeline,
+            X_train,
+            y_train,
+            cv=k_fold,
+            scoring=["accuracy", "precision", "recall", "roc_auc"],
+        )
+    )
+
     param_grid = {
         "classifier__criterion": ["entropy", "gini"],
         "classifier__max_depth": range(3, 11),
         "classifier__min_samples_leaf": range(2, 11),
         "preprocessor__numerical__outliers__n_std": [3, 4],
     }
+    LABELS = ["No Default", "Default"]
 
     classifier_gs = GridSearchCV(
-        tree_pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+        pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
     )
     classifier_gs.fit(X_train, y_train)
 
@@ -687,16 +705,14 @@ if __name__ == "__main__":
     print(f"Recall (Training set): {classifier_gs.best_score_:.4f}")
     print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs.predict(X_test)):.4f}")
 
-    LABELS = ["No Default", "Default"]
     tree_gs_perf = performance_evaluation_report(
         classifier_gs, X_test, y_test, labels=LABELS, show_plot=True
     )
     ic(tree_gs_perf)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im20.png")
+    plt.savefig("images/ch8_im20.png", bbox_inches="tight")
 
     classifier_rs = RandomizedSearchCV(
-        tree_pipeline,
+        pipeline,
         param_grid,
         scoring="recall",
         cv=k_fold,
@@ -715,30 +731,39 @@ if __name__ == "__main__":
         classifier_rs, X_test, y_test, labels=LABELS, show_plot=True
     )
     ic(tree_rs_perf)
-    plt.tight_layout()
-    plt.savefig("images/ch8_im21.png")
+    plt.savefig("images/ch8_im21.png", bbox_inches="tight")
 
-    # param_grid = [
-    #     {
-    #         "classifier": [LogisticRegression()],
-    #         "classifier__penalty": ["l1", "l2"],
-    #         "classifier__C": np.logspace(0, 3, 10, 2),
-    #         "preprocessor__numerical__outliers__n_std": [3, 4],
-    #     },
-    #     {
-    #         "classifier": [DecisionTreeClassifier(random_state=42)],
-    #         "classifier__criterion": ["entropy", "gini"],
-    #         "classifier__max_depth": range(3, 11),
-    #         "classifier__min_samples_leaf": range(2, 11),
-    #         "preprocessor__numerical__outliers__n_std": [3, 4],
-    #     },
-    # ]
-    #
-    # classifier_gs_2 = GridSearchCV(
-    #     tree_pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
-    # )
-    # classifier_gs_2.fit(X_train, y_train)
-    #
-    # print(f"Best parameters: {classifier_gs_2.best_params_}")
-    # print(f"Recall (Training set): {classifier_gs_2.best_score_:.4f}")
-    # print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}")
+    param_grid = [
+        {
+            "classifier": [LogisticRegression(solver="liblinear")],
+            "classifier__penalty": ["l1", "l2"],
+            "classifier__C": np.logspace(0, 3, num=10),
+            "preprocessor__numerical__outliers__n_std": [3, 4],
+        },
+        {
+            "classifier": [DecisionTreeClassifier(random_state=42)],
+            "classifier__criterion": ["entropy", "gini"],
+            "classifier__max_depth": range(3, 11),
+            "classifier__min_samples_leaf": range(2, 11),
+            "preprocessor__numerical__outliers__n_std": [3, 4],
+        },
+    ]
+
+    classifier_gs_2 = GridSearchCV(
+        pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+    )
+    classifier_gs_2.fit(X_train, y_train)
+
+    print(f"Best parameters: {classifier_gs_2.best_params_}")
+    print(f"Recall (Training set): {classifier_gs_2.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}")
+
+
+if __name__ == "__main__":
+    df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
+
+    # prepare_csv_missing()
+    # exploratory_data_analysis(df)
+    # split_datasets(df)
+    pipeline = sci_pipelines(df)
+    tuning_parameters(pipeline)
