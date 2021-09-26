@@ -667,6 +667,7 @@ def sci_pipelines(df):
     return tree_pipeline
 
 
+## Tuning hyperparameters using grid search and cross-validation
 def tuning_parameters(pipeline):
     X = df.copy()
     y = X.pop("default_payment_next_month")
@@ -675,22 +676,25 @@ def tuning_parameters(pipeline):
         X, y, test_size=0.2, stratify=y, random_state=42
     )
 
-    ## Tuning hyperparameters using grid search and cross-validation
-    k_fold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
-    cross_val_score(pipeline, X_train, y_train, cv=k_fold)
-    cross_validate(
-        pipeline,
-        X_train,
-        y_train,
-        cv=k_fold,
-        scoring=["accuracy", "precision", "recall", "roc_auc"],
+    k_fold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    ic(cross_val_score(pipeline, X_train, y_train, cv=k_fold))
+    ic(
+        cross_validate(
+            pipeline,
+            X_train,
+            y_train,
+            cv=k_fold,
+            scoring=["accuracy", "precision", "recall", "roc_auc"],
+        )
     )
+
     param_grid = {
         "classifier__criterion": ["entropy", "gini"],
         "classifier__max_depth": range(3, 11),
         "classifier__min_samples_leaf": range(2, 11),
         "preprocessor__numerical__outliers__n_std": [3, 4],
     }
+    LABELS = ["No Default", "Default"]
 
     classifier_gs = GridSearchCV(
         pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
@@ -701,59 +705,58 @@ def tuning_parameters(pipeline):
     print(f"Recall (Training set): {classifier_gs.best_score_:.4f}")
     print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs.predict(X_test)):.4f}")
 
-    LABELS = ["No Default", "Default"]
     tree_gs_perf = performance_evaluation_report(
         classifier_gs, X_test, y_test, labels=LABELS, show_plot=True
     )
     ic(tree_gs_perf)
     plt.savefig("images/ch8_im20.png", bbox_inches="tight")
 
-    # classifier_rs = RandomizedSearchCV(
-    #     pipeline,
-    #     param_grid,
-    #     scoring="recall",
-    #     cv=k_fold,
-    #     n_jobs=-1,
-    #     verbose=1,
-    #     n_iter=100,
-    #     random_state=42,
-    # )
-    # classifier_rs.fit(X_train, y_train)
-    #
-    # print(f"Best parameters: {classifier_rs.best_params_}")
-    # print(f"Recall (Training set): {classifier_rs.best_score_:.4f}")
-    # print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_rs.predict(X_test)):.4f}")
-    #
-    # tree_rs_perf = performance_evaluation_report(
-    #     classifier_rs, X_test, y_test, labels=LABELS, show_plot=True
-    # )
-    # ic(tree_rs_perf)
-    # plt.savefig("images/ch8_im21.png", bbox_inches="tight")
-    #
-    # param_grid = [
-    #     {
-    #         "classifier": [LogisticRegression()],
-    #         "classifier__penalty": ["l1", "l2"],
-    #         "classifier__C": np.logspace(0, 3, 10, 2),
-    #         "preprocessor__numerical__outliers__n_std": [3, 4],
-    #     },
-    #     {
-    #         "classifier": [DecisionTreeClassifier(random_state=42)],
-    #         "classifier__criterion": ["entropy", "gini"],
-    #         "classifier__max_depth": range(3, 11),
-    #         "classifier__min_samples_leaf": range(2, 11),
-    #         "preprocessor__numerical__outliers__n_std": [3, 4],
-    #     },
-    # ]
-    #
-    # classifier_gs_2 = GridSearchCV(
-    #     pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
-    # )
-    # classifier_gs_2.fit(X_train, y_train)
-    #
-    # print(f"Best parameters: {classifier_gs_2.best_params_}")
-    # print(f"Recall (Training set): {classifier_gs_2.best_score_:.4f}")
-    # print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}")
+    classifier_rs = RandomizedSearchCV(
+        pipeline,
+        param_grid,
+        scoring="recall",
+        cv=k_fold,
+        n_jobs=-1,
+        verbose=1,
+        n_iter=100,
+        random_state=42,
+    )
+    classifier_rs.fit(X_train, y_train)
+
+    print(f"Best parameters: {classifier_rs.best_params_}")
+    print(f"Recall (Training set): {classifier_rs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_rs.predict(X_test)):.4f}")
+
+    tree_rs_perf = performance_evaluation_report(
+        classifier_rs, X_test, y_test, labels=LABELS, show_plot=True
+    )
+    ic(tree_rs_perf)
+    plt.savefig("images/ch8_im21.png", bbox_inches="tight")
+
+    param_grid = [
+        {
+            "classifier": [LogisticRegression(solver="liblinear")],
+            "classifier__penalty": ["l1", "l2"],
+            "classifier__C": np.logspace(0, 3, num=10),
+            "preprocessor__numerical__outliers__n_std": [3, 4],
+        },
+        {
+            "classifier": [DecisionTreeClassifier(random_state=42)],
+            "classifier__criterion": ["entropy", "gini"],
+            "classifier__max_depth": range(3, 11),
+            "classifier__min_samples_leaf": range(2, 11),
+            "preprocessor__numerical__outliers__n_std": [3, 4],
+        },
+    ]
+
+    classifier_gs_2 = GridSearchCV(
+        pipeline, param_grid=param_grid, scoring="recall", cv=k_fold, n_jobs=-1, verbose=1
+    )
+    classifier_gs_2.fit(X_train, y_train)
+
+    print(f"Best parameters: {classifier_gs_2.best_params_}")
+    print(f"Recall (Training set): {classifier_gs_2.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, classifier_gs_2.predict(X_test)):.4f}")
 
 
 if __name__ == "__main__":
