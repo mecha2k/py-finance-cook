@@ -647,7 +647,7 @@ def different_approaches():
     ic(results)
 
 
-def bayesian_optimization():
+def bayesian_optimization(evals=200):
     df = pd.read_csv("data/credit_card_fraud.csv")
     X = df.copy()
     y = X.pop("Class")
@@ -656,7 +656,7 @@ def bayesian_optimization():
     )
 
     N_FOLDS = 5
-    MAX_EVALS = 200
+    MAX_EVALS = evals
 
     def objective(params, n_folds=N_FOLDS, random_state=42):
         model = LGBMClassifier(**params, num_leaves=64)
@@ -744,8 +744,8 @@ def bayesian_optimization():
 
 if __name__ == "__main__":
     start = time.time()
-    advanced_classifiers(nsearch=100)
+    advanced_classifiers(nsearch=2)
     stacking_improved()
     different_approaches()
-    bayesian_optimization()
+    bayesian_optimization(evals=2)
     ic(f"elapsed time : {time.time()-start}")
