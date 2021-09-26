@@ -130,7 +130,7 @@ def performance_evaluation_report(
     return stats
 
 
-if __name__ == "__main__":
+def advanced_classifiers(nsearch=100):
     df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
     X = df.copy()
     y = X.pop("default_payment_next_month")
@@ -167,9 +167,8 @@ if __name__ == "__main__":
         ]
     )
 
-    tree_pipeline.fit(X_train, y_train)
-
     LABELS = ["No Default", "Default"]
+    tree_pipeline.fit(X_train, y_train)
     tree_perf = performance_evaluation_report(
         tree_pipeline, X_test, y_test, labels=LABELS, show_plot=True, show_pr_curve=True
     )
@@ -194,7 +193,7 @@ if __name__ == "__main__":
     )
     plt.savefig("images/ch9_im2.png", dpi=300)
 
-    xgb = XGBClassifier(random_state=42, use_label_encoder=False)
+    xgb = XGBClassifier(random_state=42, use_label_encoder=False, eval_metric="mlogloss")
     xgb_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", xgb)])
     xgb_pipeline.fit(X_train, y_train)
     xgb_perf = performance_evaluation_report(
@@ -202,7 +201,7 @@ if __name__ == "__main__":
     )
     plt.savefig("images/ch9_im3.png", dpi=300)
 
-    lgbm = LGBMClassifier(random_state=42)
+    lgbm = LGBMClassifier(random_state=42, num_leaves=64)
     lgbm_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", lgbm)])
     lgbm_pipeline.fit(X_train, y_train)
     lgbm_perf = performance_evaluation_report(
@@ -224,7 +223,7 @@ if __name__ == "__main__":
     # process as easy to follow as possible. For a complete list of hyperparameters and their meaning,
     # please refer to corresponding documentations.
 
-    N_SEARCHES = 100
+    N_SEARCHES = nsearch
     k_fold = StratifiedKFold(5, shuffle=True, random_state=42)
 
     # **Random Forest**
@@ -268,157 +267,122 @@ if __name__ == "__main__":
     rf_rs_perf = performance_evaluation_report(
         rf_rs, X_test, y_test, labels=LABELS, show_plot=True, show_pr_curve=True
     )
-    #
-    #
-    # # **Gradient Boosted Trees**
-    #
-    # # As Gradient Boosted Trees are also an ensemble method built on top of decision trees, a lot of the parameters are the same as in the case of the Random Forest. The new one is the learning rate, which is used in the gradient descent algorithm to control the rate of descent towards the minimum of the loss function. When tuning the tree manually, we should consider this hyperparameter together with the number of estimators, as reducing the learning rate (the learning is slower), while increasing the number of estimators can increase the computation time significantly.
-    # #
-    # # We define the grid as follows:
-    #
-    # # In[ ]:
-    #
-    #
-    # gbt_param_grid = {'classifier__n_estimators': np.linspace(100, 1000, 10, dtype=int),
-    #                   'classifier__learning_rate': np.arange(0.05, 0.31, 0.05),
-    #                   'classifier__max_depth': np.arange(3, 11, 1, dtype=int),
-    #                   'classifier__min_samples_split': np.linspace(0.1, 0.5, 12),
-    #                   'classifier__min_samples_leaf': np.arange(1, 51, 2, dtype=int),
-    #                   'classifier__max_features':['log2', 'sqrt', None]}
-    #
-    #
-    # # And run the randomized search:
-    #
-    # # In[ ]:
-    #
-    #
-    # gbt_rs =  RandomizedSearchCV(gbt_pipeline, gbt_param_grid, scoring='recall',
-    #                              cv=k_fold, n_jobs=-1, verbose=1,
-    #                              n_iter=N_SEARCHES, random_state=42)
-    #
-    # gbt_rs.fit(X_train, y_train)
-    #
-    # print(f'Best parameters: {gbt_rs.best_params_}')
-    # print(f'Recall (Training set): {gbt_rs.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, gbt_rs.predict(X_test)):.4f}')
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    # gbt_rs_perf = performance_evaluation_report(gbt_rs, X_test,
-    #                                             y_test, labels=LABELS,
-    #                                             show_plot=True,
-    #                                             show_pr_curve=True)
-    #
-    #
-    # # **XGBoost**
-    #
-    # # The scikit-learn API of XGBoost makes sure that the hyperparameters are named similarly to their equivalents other scikit-learn's classifiers. So the XGBoost native eta hyperparameter is called learning_rate in scikit-learn's API.
-    # #
-    # # The new hyperparameters we consider for this example are:
-    # # * `min_child_weight` - indicates the minimum sum of weights of all observations required in a child. This hyperparameter is used for controlling overfitting. Cross-validation should be used for tuning.
-    # # * `colsample_bytree` - indicates the fraction of columns to be randomly sampled for each tree.
-    # #
-    # # We define the grid as:
-    #
-    # # In[ ]:
-    #
-    #
-    # xgb_param_grid = {'classifier__n_estimators': np.linspace(100, 1000, 10, dtype=int),
-    #                   'classifier__learning_rate': np.arange(0.05, 0.31, 0.05),
-    #                   'classifier__max_depth': np.arange(3, 11, 1, dtype=int),
-    #                   'classifier__min_child_weight': np.arange(1, 8, 1, dtype=int),
-    #                   'classifier__colsample_bytree': np.linspace(0.3, 1, 7)}
-    #
-    #
-    # # For defining ranges of parameters that are restricted (such as colsample_bytree which cannot be higher than 1.0) it is better to use `np.linspace` rather than `np.arange`, because the latter allows for some inconsistencies when the step is defined as floating-point. For example, the last value might be 1.0000000002, which then causes an error while training the classifier.
-    #
-    # # In[ ]:
-    #
-    #
-    # xgb_rs =  RandomizedSearchCV(xgb_pipeline, xgb_param_grid, scoring='recall',
-    #                              cv=k_fold, n_jobs=-1, verbose=1,
-    #                              n_iter=N_SEARCHES, random_state=42)
-    #
-    # xgb_rs.fit(X_train, y_train)
-    #
-    # print(f'Best parameters: {xgb_rs.best_params_}')
-    # print(f'Recall (Training set): {xgb_rs.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, xgb_rs.predict(X_test)):.4f}')
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    # xgb_rs_perf = performance_evaluation_report(xgb_rs, X_test,
-    #                                             y_test, labels=LABELS,
-    #                                             show_plot=True,
-    #                                             show_pr_curve=True)
-    #
-    #
-    # # **LightGBM**
-    #
-    # # We tune the same parameters as in XGBoost, though more is definitely possible and encouraged. The grid is defined as follows:
-    #
-    # # In[ ]:
-    #
-    #
-    # lgbm_param_grid = {'classifier__n_estimators': np.linspace(100, 1000, 10, dtype=int),
-    #                    'classifier__learning_rate': np.arange(0.05, 0.31, 0.05),
-    #                    'classifier__max_depth': np.arange(3, 11, 1, dtype=int),
-    #                    'classifier__colsample_bytree': np.linspace(0.3, 1, 7)}
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    # lgbm_rs =  RandomizedSearchCV(lgbm_pipeline, lgbm_param_grid, scoring='recall',
-    #                               cv=k_fold, n_jobs=-1, verbose=1,
-    #                               n_iter=N_SEARCHES, random_state=42)
-    #
-    # lgbm_rs.fit(X_train, y_train)
-    #
-    # print(f'Best parameters: {lgbm_rs.best_params_}')
-    # print(f'Recall (Training set): {lgbm_rs.best_score_:.4f}')
-    # print(f'Recall (Test set): {metrics.recall_score(y_test, lgbm_rs.predict(X_test)):.4f}')
-    #
-    #
-    # # In[ ]:
-    #
-    #
-    # lgbm_rs_perf = performance_evaluation_report(lgbm_rs, X_test,
-    #                                              y_test, labels=LABELS,
-    #                                              show_plot=True,
-    #                                              show_pr_curve=True)
-    #
-    #
-    # # Below we present a summary of all the classifiers we have considered in the last 3 recipes.
-    #
-    # # In[ ]:
-    #
-    #
-    # results_dict = {'decision_tree_baseline': tree_perf,
-    #                 'random_forest': rf_perf,
-    #                 'random_forest_rs': rf_rs_perf,
-    #                 'gradient_boosted_trees': gbt_perf,
-    #                 'gradient_boosted_trees_rs': gbt_rs_perf,
-    #                 'xgboost': xgb_perf,
-    #                 'xgboost_rs': xgb_rs_perf,
-    #                 'light_gbm': lgbm_perf,
-    #                 'light_gbm_rs': lgbm_rs_perf}
-    #
-    # results_comparison = pd.DataFrame(results_dict).T
-    # results_comparison
-    #
-    #
-    # # In[47]:
-    #
-    #
-    # results_comparison = pd.read_csv('results_comparison.csv')
-    # results_comparison.rename(columns={'Unnamed: 0': 'model'}, inplace=True)
-    # results_comparison
-    #
+
+    # **Gradient Boosted Trees**
+    # As Gradient Boosted Trees are also an ensemble method built on top of decision trees,
+    # a lot of the parameters are the same as in the case of the Random Forest. The new one is
+    # the learning rate, which is used in the gradient descent algorithm to control the rate of
+    # descent towards the minimum of the loss function. When tuning the tree manually, we should
+    # consider this hyperparameter together with the number of estimators, as reducing the learning
+    # rate (the learning is slower), while increasing the number of estimators can increase
+    # the computation time significantly.
+    gbt_param_grid = {
+        "classifier__n_estimators": np.linspace(100, 1000, 10, dtype=int),
+        "classifier__learning_rate": np.arange(0.05, 0.31, 0.05),
+        "classifier__max_depth": np.arange(3, 11, 1, dtype=int),
+        "classifier__min_samples_split": np.linspace(0.1, 0.5, 12),
+        "classifier__min_samples_leaf": np.arange(1, 51, 2, dtype=int),
+        "classifier__max_features": ["log2", "sqrt", None],
+    }
+    gbt_rs = RandomizedSearchCV(
+        gbt_pipeline,
+        gbt_param_grid,
+        scoring="recall",
+        cv=k_fold,
+        n_jobs=-1,
+        verbose=1,
+        n_iter=N_SEARCHES,
+        random_state=42,
+    )
+    gbt_rs.fit(X_train, y_train)
+    print(f"Best parameters: {gbt_rs.best_params_}")
+    print(f"Recall (Training set): {gbt_rs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, gbt_rs.predict(X_test)):.4f}")
+    gbt_rs_perf = performance_evaluation_report(
+        gbt_rs, X_test, y_test, labels=LABELS, show_plot=True, show_pr_curve=True
+    )
+    # **XGBoost**
+    # The scikit-learn API of XGBoost makes sure that the hyperparameters are named similarly
+    # to their equivalents other scikit-learn's classifiers. So the XGBoost native eta hyperparameter
+    # is called learning_rate in scikit-learn's API.
+    # The new hyperparameters we consider for this example are:
+    # * `min_child_weight` - indicates the minimum sum of weights of all observations required in a child.
+    #    This hyperparameter is used for controlling overfitting. Cross-validation should be used for tuning.
+    # * `colsample_bytree` - indicates the fraction of columns to be randomly sampled for each tree.
+    xgb_param_grid = {
+        "classifier__n_estimators": np.linspace(100, 1000, 10, dtype=int),
+        "classifier__learning_rate": np.arange(0.05, 0.31, 0.05),
+        "classifier__max_depth": np.arange(3, 11, 1, dtype=int),
+        "classifier__min_child_weight": np.arange(1, 8, 1, dtype=int),
+        "classifier__colsample_bytree": np.linspace(0.3, 1, 7),
+    }
+    # For defining ranges of parameters that are restricted (such as colsample_bytree which cannot be higher
+    # than 1.0) it is better to use `np.linspace` rather than `np.arange`, because the latter allows for some
+    # inconsistencies when the step is defined as floating-point. For example, the last value might be 1.0000000002,
+    # which then causes an error while training the classifier.
+    xgb_rs = RandomizedSearchCV(
+        xgb_pipeline,
+        xgb_param_grid,
+        scoring="recall",
+        cv=k_fold,
+        n_jobs=-1,
+        verbose=1,
+        n_iter=N_SEARCHES,
+        random_state=42,
+    )
+    xgb_rs.fit(X_train, y_train)
+    print(f"Best parameters: {xgb_rs.best_params_}")
+    print(f"Recall (Training set): {xgb_rs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, xgb_rs.predict(X_test)):.4f}")
+    xgb_rs_perf = performance_evaluation_report(
+        xgb_rs, X_test, y_test, labels=LABELS, show_plot=True, show_pr_curve=True
+    )
+
+    # **LightGBM**
+    lgbm_param_grid = {
+        "classifier__n_estimators": np.linspace(100, 1000, 10, dtype=int),
+        "classifier__learning_rate": np.arange(0.05, 0.31, 0.05),
+        "classifier__max_depth": np.arange(3, 11, 1, dtype=int),
+        "classifier__colsample_bytree": np.linspace(0.3, 1, 7),
+    }
+    lgbm_rs = RandomizedSearchCV(
+        lgbm_pipeline,
+        lgbm_param_grid,
+        scoring="recall",
+        cv=k_fold,
+        n_jobs=-1,
+        verbose=1,
+        n_iter=N_SEARCHES,
+        random_state=42,
+    )
+    lgbm_rs.fit(X_train, y_train)
+    print(f"Best parameters: {lgbm_rs.best_params_}")
+    print(f"Recall (Training set): {lgbm_rs.best_score_:.4f}")
+    print(f"Recall (Test set): {metrics.recall_score(y_test, lgbm_rs.predict(X_test)):.4f}")
+    lgbm_rs_perf = performance_evaluation_report(
+        lgbm_rs, X_test, y_test, labels=LABELS, show_plot=True, show_pr_curve=True
+    )
+
+    results_dict = {
+        "decision_tree_baseline": tree_perf,
+        "random_forest": rf_perf,
+        "random_forest_rs": rf_rs_perf,
+        "gradient_boosted_trees": gbt_perf,
+        "gradient_boosted_trees_rs": gbt_rs_perf,
+        "xgboost": xgb_perf,
+        "xgboost_rs": xgb_rs_perf,
+        "light_gbm": lgbm_perf,
+        "light_gbm_rs": lgbm_rs_perf,
+    }
+
+    results_comparison = pd.DataFrame(results_dict).T
+    results_comparison.to_csv("data/results_comparison.csv")
+    ic(results_comparison)
+
+
+if __name__ == "__main__":
+    advanced_classifiers(nsearch=2)
+
     #
     # # ## Using stacking for improved performance
     #
