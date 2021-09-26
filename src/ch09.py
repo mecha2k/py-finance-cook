@@ -641,264 +641,110 @@ def different_approaches():
     ic(results)
 
 
+import pickle
+from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from pandas.io.json import json_normalize
+from hyperopt.pyll.stochastic import sample
+
+
+def bayesian_optimization():
+    df = pd.read_csv("data/credit_card_fraud.csv")
+    X = df.copy()
+    y = X.pop("Class")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+
+    N_FOLDS = 5
+    MAX_EVALS = 2
+
+    def objective(params, n_folds=N_FOLDS, random_state=42):
+        model = LGBMClassifier(**params, num_leaves=64)
+        model.set_params(random_state=random_state)
+        k_fold = StratifiedKFold(n_folds, shuffle=True, random_state=random_state)
+        metrics = cross_val_score(model, X_train, y_train, cv=k_fold, scoring="recall")
+        loss = -1 * metrics.mean()
+        return {"loss": loss, "params": params, "status": STATUS_OK}
+
+    lgbm_param_grid = {
+        "boosting_type": hp.choice("boosting_type", ["gbdt", "dart", "goss"]),
+        "max_depth": hp.choice("max_depth", [-1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        "n_estimators": hp.choice("n_estimators", [10, 50, 100, 300, 750, 1000]),
+        "is_unbalance": hp.choice("is_unbalance", [True, False]),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.3, 1),
+        "learning_rate": hp.uniform("learning_rate", 0.05, 0.3),
+    }
+
+    trials = Trials()
+    best_set = fmin(
+        fn=objective, space=lgbm_param_grid, algo=tpe.suggest, max_evals=MAX_EVALS, trials=trials
+    )
+
+    # load if already finished the search
+    best_set = pickle.load(open("data/best_set.p", "rb"))
+    ic(best_set)
+
+    boosting_type = {0: "gbdt", 1: "dart", 2: "goss"}
+    max_depth = {0: -1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10}
+    n_estimators = {0: 10, 1: 50, 2: 100, 3: 300, 4: 750, 5: 1000}
+    is_unbalance = {0: True, 1: False}
+
+    lgbm_param_grid = {
+        "boosting_type": hp.choice("boosting_type", ["gbdt", "dart", "goss"]),
+        "max_depth": hp.choice("max_depth", [-1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        "n_estimators": hp.choice("n_estimators", [10, 50, 100, 300, 750, 1000]),
+        "is_unbalance": hp.choice("is_unbalance", [True, False]),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.3, 1),
+        "learning_rate": hp.uniform("learning_rate", 0.05, 0.3),
+    }
+
+    best_lgbm = LGBMClassifier(
+        boosting_type=boosting_type[best_set["boosting_type"]],
+        max_depth=max_depth[best_set["max_depth"]],
+        n_estimators=n_estimators[best_set["n_estimators"]],
+        is_unbalance=is_unbalance[best_set["is_unbalance"]],
+        colsample_bytree=best_set["colsample_bytree"],
+        learning_rate=best_set["learning_rate"],
+        num_leaves=64,
+    )
+    best_lgbm.fit(X_train, y_train)
+
+    _ = performance_evaluation_report(best_lgbm, X_test, y_test, show_plot=True, show_pr_curve=True)
+    plt.savefig("images/ch9_im13.png", dpi=300)
+
+    trials = pickle.load(open("data/trials_final.p", "rb"))
+    results_df = pd.DataFrame(trials.results)
+    params_df = json_normalize(results_df["params"])
+    results_df = pd.concat([results_df.drop("params", axis=1), params_df], axis=1)
+    results_df["iteration"] = np.arange(len(results_df)) + 1
+    results_df.sort_values("loss")
+
+    colsample_bytree_dist = []
+    for _ in range(10000):
+        x = sample(lgbm_param_grid["colsample_bytree"])
+        colsample_bytree_dist.append(x)
+
+    fig, ax = plt.subplots(1, 2, figsize=(16, 8))
+    sns.kdeplot(colsample_bytree_dist, label="Sampling Distribution", ax=ax[0])
+    sns.kdeplot(results_df["colsample_bytree"], label="Bayesian Optimization", ax=ax[0])
+    ax[0].set(title="Distribution of colsample_bytree", xlabel="Value", ylabel="Density")
+    ax[0].legend()
+    sns.regplot("iteration", "colsample_bytree", data=results_df, ax=ax[1])
+    ax[1].set(title="colsample_bytree over Iterations", xlabel="Iteration", ylabel="Value")
+    plt.savefig("images/ch9_im14.png", dpi=300)
+
+    results_df["n_estimators"].value_counts().plot.bar(title="# of Estimators, Distribution")
+    plt.savefig("images/ch9_im15.png", dpi=300)
+
+    fig, ax = plt.subplots()
+    ax.plot(results_df.iteration, results_df.loss, "o")
+    ax.set(title="TPE Sequence of Losses", xlabel="Iteration", ylabel="Loss")
+    plt.savefig("images/ch9_im16.png", dpi=300)
+
+
 if __name__ == "__main__":
     # advanced_classifiers(nsearch=2)
     # stacking_improved()
-    different_approaches()
-
-    # # ## Bayesian Hyperparameter Optimization
-    #
-    # # ### How to do it...
-    #
-    # # 1. Load the libraries:
-    #
-    # # In[49]:
-    #
-    #
-    # import pandas as pd
-    # import pickle
-    # from sklearn.model_selection import train_test_split
-    # from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
-    # from sklearn.model_selection import (cross_val_score,
-    #                                      StratifiedKFold)
-    # from lightgbm import LGBMClassifier
-    # from chapter_9_utils import performance_evaluation_report
-    # import pickle
-    #
-    #
-    # # 2. Define parameters for later use:
-    #
-    # # In[69]:
-    #
-    #
-    # N_FOLDS = 5
-    # MAX_EVALS = 200
-    #
-    #
-    # # 3. Load and prepare the data:
-    #
-    # # In[70]:
-    #
-    #
-    # df = pd.read_csv('../Datasets/credit_card_fraud.csv')
-    #
-    # X = df.copy()
-    # y = X.pop('Class')
-    #
-    # X_train, X_test, y_train, y_test = train_test_split(X, y,
-    #                                                     test_size=0.2,
-    #                                                     stratify=y,
-    #                                                     random_state=42)
-    #
-    #
-    # # 4. Define the objective function:
-    #
-    # # In[71]:
-    #
-    #
-    # def objective(params, n_folds = N_FOLDS, random_state=42):
-    #
-    #     model = LGBMClassifier(**params)
-    #     model.set_params(random_state=42)
-    #
-    #     k_fold = StratifiedKFold(n_folds, shuffle=True,
-    #                              random_state=42)
-    #
-    #     metrics = cross_val_score(model, X_train, y_train,
-    #                               cv=k_fold, scoring='recall')
-    #     loss = -1 * metrics.mean()
-    #
-    #     return {'loss': loss, 'params': params, 'status': STATUS_OK}
-    #
-    #
-    # # 5. Define the search space:
-    #
-    # # In[72]:
-    #
-    #
-    # lgbm_param_grid = {
-    #     'boosting_type': hp.choice('boosting_type', ['gbdt', 'dart', 'goss']),
-    #     'max_depth': hp.choice('max_depth', [-1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
-    #     'n_estimators': hp.choice('n_estimators', [10, 50, 100,
-    #                                                300, 750, 1000]),
-    #     'is_unbalance': hp.choice('is_unbalance', [True, False]),
-    #     'colsample_bytree': hp.uniform('colsample_bytree', 0.3, 1),
-    #     'learning_rate': hp.uniform ('learning_rate', 0.05, 0.3),
-    # }
-    #
-    #
-    # # 6. Run the Bayesian optimization:
-    #
-    # # In[ ]:
-    #
-    #
-    # trials = Trials()
-    # best_set = fmin(fn= objective,
-    #                 space= lgbm_param_grid,
-    #                 algo= tpe.suggest,
-    #                 max_evals = MAX_EVALS,
-    #                 trials= trials)
-    #
-    #
-    # # In[73]:
-    #
-    #
-    # # load if already finished the search
-    # #best_set = pickle.load(open('best_set.p', 'rb'))
-    # best_set
-    #
-    #
-    # # 7. Define the dictionaries for mapping the results to hyperparameter values:
-    #
-    # # In[74]:
-    #
-    #
-    # boosting_type = {0: 'gbdt', 1: 'dart', 2: 'goss'}
-    # max_depth = {0: -1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6,
-    #              6: 7, 7: 8, 8: 9, 9: 10}
-    # n_estimators = {0: 10, 1: 50, 2: 100, 3: 300, 4: 750, 5: 1000}
-    # is_unbalance = {0: True, 1: False}
-    #
-    #
-    # # 8. Fit a model using the best hyperparameters:
-    #
-    # # In[75]:
-    #
-    #
-    # lgbm_param_grid = {'boosting_type': hp.choice('boosting_type', ['gbdt', 'dart', 'goss']),
-    #                    'max_depth': hp.choice('max_depth', [-1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
-    #                    'n_estimators': hp.choice('n_estimators', [10, 50, 100, 300, 750, 1000]),
-    #                    'is_unbalance': hp.choice('is_unbalance', [True, False]),
-    #                    'colsample_bytree': hp.uniform('colsample_bytree', 0.3, 1),
-    #                    'learning_rate': hp.uniform ('learning_rate', 0.05, 0.3),
-    #                   }
-    #
-    #
-    # # In[76]:
-    #
-    #
-    # best_lgbm = LGBMClassifier(
-    #     boosting_type = boosting_type[best_set['boosting_type']],
-    #     max_depth = max_depth[best_set['max_depth']],
-    #     n_estimators = n_estimators[best_set['n_estimators']],
-    #     is_unbalance = is_unbalance[best_set['is_unbalance']],
-    #     colsample_bytree = best_set['colsample_bytree'],
-    #     learning_rate = best_set['learning_rate']
-    # )
-    # best_lgbm.fit(X_train, y_train)
-    #
-    #
-    # # 9. Evaluate on the test set:
-    #
-    # # In[79]:
-    #
-    #
-    # _ = performance_evaluation_report(best_lgbm, X_test, y_test,
-    #                                   show_plot=True,
-    #                                   show_pr_curve=True)
-    #
-    # plt.savefig('images/ch9_im13.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # ### There's more
-    #
-    # # 1. Import the libraries:
-    #
-    # # In[50]:
-    #
-    #
-    # from pandas.io.json import json_normalize
-    # from hyperopt.pyll.stochastic import sample
-    #
-    #
-    # # In[51]:
-    #
-    #
-    # import pickle
-    # trials = pickle.load(open("trials_final.p", "rb"))
-    #
-    #
-    # # 2. Parse all the information from `trials.results` into a DataFrame:
-    #
-    # # In[52]:
-    #
-    #
-    # results_df = pd.DataFrame(trials.results)
-    # params_df = json_normalize(results_df['params'])
-    #
-    # results_df = pd.concat([results_df.drop('params', axis=1), params_df],
-    #                        axis=1)
-    # results_df['iteration'] = np.arange(len(results_df)) + 1
-    # results_df.sort_values('loss')
-    #
-    #
-    # # 3. Draw sample from the selected distribution of `colsample_bytree`:
-    #
-    # # In[86]:
-    #
-    #
-    # colsample_bytree_dist = []
-    #
-    # for _ in range(10000):
-    #     x = sample(lgbm_param_grid['colsample_bytree'])
-    #     colsample_bytree_dist.append(x)
-    #
-    #
-    # # 4. Plot the results:
-    #
-    # # In[88]:
-    #
-    #
-    # fig, ax = plt.subplots(1, 2, figsize = (16, 8))
-    #
-    # sns.kdeplot(colsample_bytree_dist,
-    #             label='Sampling Distribution',
-    #             ax=ax[0])
-    # sns.kdeplot(results_df['colsample_bytree'],
-    #             label='Bayesian Optimization',
-    #             ax=ax[0])
-    # ax[0].set(title='Distribution of colsample_bytree',
-    #           xlabel='Value',
-    #           ylabel='Density')
-    # ax[0].legend()
-    #
-    # sns.regplot('iteration', 'colsample_bytree',
-    #             data=results_df, ax=ax[1])
-    # ax[1].set(title='colsample_bytree over Iterations',
-    #           xlabel='Iteration',
-    #           ylabel='Value')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im14.png', dpi=300)
-    # plt.show()
-    #
-    #
-    # # 5. Plot the distribution of `n_estimators`:
-    #
-    # # In[53]:
-    #
-    #
-    # results_df['n_estimators'].value_counts()                           .plot                           .bar(title=('# of Estimators'
-    #                                       ' Distribution'))
-    #
-    # # plt.tight_layout()
-    # # plt.savefig('images/ch9_im15.png', dpi=300)
-    # # plt.show()
-    #
-    #
-    # # 6. Plot the evolution of the observed losses over iterations:
-    #
-    # # In[90]:
-    #
-    #
-    # fig, ax = plt.subplots()
-    # ax.plot(results_df.iteration, results_df.loss, 'o')
-    # ax.set(title='TPE Sequence of Losses',
-    #        xlabel='Iteration',
-    #        ylabel='Loss')
-    #
-    # plt.tight_layout()
-    # plt.savefig('images/ch9_im16.png', dpi=300)
-    # plt.show()
-    #
+    # different_approaches()
+    bayesian_optimization()
