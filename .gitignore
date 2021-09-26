@@ -12,6 +12,7 @@ yarn-error.log*
 lerna-debug.log*
 
 src/choromedriver
+src/data/credit_card_fraud.csv
 
 .DS_Store
 .vscode
