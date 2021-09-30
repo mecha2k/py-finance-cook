@@ -13,6 +13,7 @@ lerna-debug.log*
 
 src/choromedriver
 src/data/credit_card_fraud.csv
+src/images
 
 .DS_Store
 .vscode

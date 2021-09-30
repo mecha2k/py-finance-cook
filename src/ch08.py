@@ -762,8 +762,8 @@ def tuning_parameters(pipeline):
 if __name__ == "__main__":
     df = pd.read_csv("data/credit_card_default.csv", index_col=0, na_values="")
 
-    # prepare_csv_missing()
-    # exploratory_data_analysis(df)
-    # split_datasets(df)
+    prepare_csv_missing()
+    exploratory_data_analysis(df)
+    split_datasets(df)
     pipeline = sci_pipelines(df)
     tuning_parameters(pipeline)
