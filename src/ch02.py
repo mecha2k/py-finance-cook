@@ -175,7 +175,7 @@ if __name__ == "__main__":
     #
     #     def next(self):
     #         # do nothing if an order is pending
-    #         if self.order:
+    #         if self.order:z
     #             return
     #         # check if there is already a position
     #         if not self.position:
