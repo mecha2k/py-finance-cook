@@ -9,13 +9,12 @@ import quandl
 import warnings
 import os
 import pandas_datareader.data as web
-import pyfolio as pf
 import scipy.optimize as sco
 import cvxpy as cp
 
 from scipy.stats import norm
 from pandas_datareader.famafrench import get_available_datasets
-from datetime import date, datetime
+from datetime import datetime
 from dotenv import load_dotenv
 from icecream import ic
 
@@ -23,12 +22,14 @@ plt.style.use("seaborn")
 sns.set_palette("cubehelix")
 plt.rcParams["figure.figsize"] = [8, 5]
 plt.rcParams["figure.dpi"] = 300
-warnings.simplefilter(action="ignore", category=FutureWarning)
+# warnings.simplefilter(action="ignore", category=FutureWarning)
 
 load_dotenv(verbose=True)
 quandl.ApiConfig.api_key = os.getenv("Quandl")
 
 if __name__ == "__main__":
+    start = datetime(2018, 1, 1)
+    end = datetime(2018, 12, 31)
     risky_assets = ["FB", "TSLA", "TWTR", "MSFT"]
     risky_assets.sort()
     n_assets = len(risky_assets)
@@ -51,7 +52,11 @@ if __name__ == "__main__":
 
     returns_df = prices_df["Adj Close"].pct_change().dropna()
     avg_returns = returns_df.mean(axis=0) * N_DAYS
+    ret_df1 = (1 + returns_df).cumprod()
+    ic(ret_df1.iloc[-1])
+    ic(avg_returns)
     cov_mat = returns_df.cov(ddof=1) * N_DAYS
+    ic(cov_mat)
     returns_df.plot(title="Daily returns of the considered assets")
     plt.tight_layout()
     plt.savefig("images/ch7_im3.png")
