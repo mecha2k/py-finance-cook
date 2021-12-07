@@ -112,16 +112,8 @@ def test_autocorrelation(x, n_lags=40, alpha=0.05, h0_type="c"):
 
     adf_results = adf_test(x)
     kpss_results = kpss_test(x, h0_type=h0_type)
-    print(
-        "ADF test statistic: {:.2f} (p-val: {:.2f})".format(
-            adf_results["Test Statistic"], adf_results["p-value"]
-        )
-    )
-    print(
-        "KPSS test statistic: {:.2f} (p-val: {:.2f})".format(
-            kpss_results["Test Statistic"], kpss_results["p-value"]
-        )
-    )
+    print("ADF test statistic: {:.2f} (p-val: {:.2f})".format(adf_results["Test Statistic"], adf_results["p-value"]))
+    print("KPSS test statistic: {:.2f} (p-val: {:.2f})".format(kpss_results["Test Statistic"], kpss_results["p-value"]))
     fig, ax = plt.subplots(2, figsize=(8, 4))
     plot_acf(x, ax=ax[0], lags=n_lags, alpha=alpha)
     plot_pacf(x, ax=ax[1], lags=n_lags, alpha=alpha)
@@ -162,6 +154,9 @@ def decompose_time_series():
 
 
 def decompose_with_prophet():
+    start = datetime(2018, 1, 1)
+    end = datetime(2018, 12, 31)
+
     src_data = "data/qd_gold_day.pkl"
     try:
         gold_day = pd.read_pickle(src_data)
@@ -332,17 +327,11 @@ def exponential_smoothing():
     plt.savefig("images/ch3_im14.png")
 
     # 6. Fit 3 Simple Exponential Smoothing models and create forecasts:
-    ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=0.2
-    )
+    ses_1 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(smoothing_level=0.2)
     ses_forecast_1 = ses_1.forecast(steps=test_length)
-    ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=0.5
-    )
+    ses_2 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(smoothing_level=0.5)
     ses_forecast_2 = ses_2.forecast(steps=test_length)
-    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(
-        smoothing_level=None
-    )
+    ses_3 = SimpleExpSmoothing(goog_train, initialization_method="estimated").fit(smoothing_level=None)
     alpha = ses_3.model.params["smoothing_level"]
     ses_forecast_3 = ses_3.forecast(steps=test_length)
 
@@ -405,9 +394,7 @@ def exponential_smoothing():
     hw_forecast_2 = hw_2.forecast(test_length)
 
     plt.clf()
-    goog.plot(
-        color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True
-    )
+    goog.plot(color=COLORS[0], title="Holt-Winter's Seasonal Smoothing", label="Actual", legend=True)
     hw_1.fittedvalues.plot(color=COLORS[1])
     hw_forecast_1.plot(color=COLORS[1], legend=True, label="Seasonal Smoothing")
     phi = hw_2.model.params["damping_trend"]
@@ -541,16 +528,10 @@ def arima_models():
     _, ax = plt.subplots(1)
     ax = sns.lineplot(data=test, color=COLORS[0], label="Actual")
     ax.plot(arima_pred.prediction, c=COLORS[1], label="ARIMA(2,1,1)")
-    ax.fill_between(
-        arima_pred.index, arima_pred.ci_lower, arima_pred.ci_upper, alpha=0.3, facecolor=COLORS[1]
-    )
+    ax.fill_between(arima_pred.index, arima_pred.ci_lower, arima_pred.ci_upper, alpha=0.3, facecolor=COLORS[1])
     ax.plot(auto_arima_pred.prediction, c=COLORS[2], label="ARIMA(3,1,2)")
     ax.fill_between(
-        auto_arima_pred.index,
-        auto_arima_pred.ci_lower,
-        auto_arima_pred.ci_upper,
-        alpha=0.2,
-        facecolor=COLORS[2],
+        auto_arima_pred.index, auto_arima_pred.ci_lower, auto_arima_pred.ci_upper, alpha=0.2, facecolor=COLORS[2],
     )
     ax.set(title="Google's stock price  - actual vs. predicted", xlabel="Date", ylabel="Price ($)")
     ax.legend(loc="upper left")
